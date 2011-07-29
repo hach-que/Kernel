@@ -68,12 +68,21 @@ void outportb(unsigned short _port, unsigned char _data)
  * infinite loop.  This will be like our 'idle' loop */
 void main()
 {
-	unsigned char msg[] = { 'H', 'e', 'l', 'l', 'o', ' ', 'W', 'o', 'r', 'l', 'd', '!', 0 };
+	/* Setup the very core components of the kernel / CPU operation */
+	gdt_install();
+	idt_install();
+	isrs_install();
+	irq_install();
+	
+	/* Enable IRQs */
+	__asm__ __volatile__ ("sti");
+
+	/* Install and handle various devices in the system */
+	timer_install();
+	kb_install();
 
 	/* You would add commands after here */
 	init_video();
-	putch('H');
-	puts(msg);
 	puts("Hello World Again!\0");
 
 	/* ...and leave this loop in.  There is an endless loop in

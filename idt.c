@@ -38,6 +38,7 @@ void idt_set_gate(unsigned char num, unsigned long base, unsigned short sel, uns
 
 	/* Set the other fields */
 	idt[num].sel = sel;
+	idt[num].always0 = 0;
 	idt[num].flags = flags;
 }
 

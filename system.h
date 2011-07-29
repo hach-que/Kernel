@@ -16,4 +16,36 @@ extern void puts(unsigned char* str);
 extern void settextcolor(unsigned char forecolor, unsigned char backcolor);
 extern void init_video();
 
+/* GDT.C */
+extern void _gdt_flush();
+extern void gdt_set_gate(int num, unsigned long base, unsigned long limit, unsigned char access, unsigned char gran);
+extern void gdt_install();
+
+/* IDT.C */
+extern void _idt_load();
+extern void idt_set_gate(unsigned char num, unsigned long base, unsigned short sel, unsigned char flags);
+extern void idt_install();
+
+/* ISRS.C */
+struct regs /* This defines what the stack looks like after an ISR was running */
+{
+	unsigned int gs, fs, es, ds;                            /* pushed the segs last */
+	unsigned int edi, esi, ebp, esp, ebx, edx, ecx, eax;    /* pushed by 'pusha' */
+	unsigned int int_no, err_code;                          /* our 'push byte #' and ecodes do this */
+	unsigned int eip, cs, eflags, useresp, ss;              /* pushed by the processor automatically */
+};
+extern void isrs_install();
+
+/* IRQ.C */
+extern void irq_install();
+extern void irq_install_handler(int irq, void (*handler)(struct regs* r));
+extern void irq_uninstall_handler(int irq);
+
+/* TIMER.C */
+extern void timer_install();
+extern void timer_wait(int ticks);
+
+/* KB.C */
+extern void kb_install();
+
 #endif
