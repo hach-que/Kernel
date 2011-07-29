@@ -53,10 +53,25 @@ void outportb(unsigned short _port, unsigned char _data)
 	__asm__ __volatile__ ("outb %1, %0" : : "dN" (_port), "a" (_data));
 }
 
+void printmem()
+{
+	unsigned char itoa_buffer[256];
+	puts(" [pzero: ");
+	puts(itoa(mem_getpage0usage(), itoa_buffer, 10));
+	puts("] [usage: ");
+	puts(itoa(mem_getpageusage(), itoa_buffer, 10));
+	puts("] [avail: ");
+	puts(itoa(mem_getpageavail(), itoa_buffer, 10));
+	puts("]\n");
+}
+
 /* This is a very simple main() function.  All it does is sit in an
  * infinite loop.  This will be like our 'idle' loop */
 void _main(struct multiboot_info* mbt, unsigned int magic)
 {
+	void* test1 = 0;
+	void* test2 = 0;
+
 	/* Setup the very core components of the kernel / CPU operation */
 	gdt_install();
 	idt_install();
@@ -69,11 +84,31 @@ void _main(struct multiboot_info* mbt, unsigned int magic)
 	/* Install and handle various devices in the system */
 	timer_install();
 	kb_install();
+	init_video();
+	mem_install(mbt, magic);
+	//page_install();
 
 	/* You would add commands after here */
-	init_video();
-	puts("Hello World Again!\n");
-	mem_install(mbt, magic);
+	puts("=== Memory tests ===\n");
+	printmem();
+	puts("Allocating 20 bytes to test1...\n");
+	test1 = palloc(20);
+	printmem();
+	puts("Freeing 20 bytes from test1...\n");
+	pfree(test1, 20);
+	printmem();
+	puts("Allocating 20 bytes to test1...\n");
+	test1 = palloc(20);
+	printmem();
+	puts("Allocating 20 bytes to test2...\n");
+	test2 = palloc(20);
+	printmem();
+	puts("Freeing 20 bytes from test1...\n");
+	pfree(test1, 20);
+	printmem();
+	puts("Freeing 20 bytes from test2...\n");
+	pfree(test2, 20);
+	printmem();
 
 	/* ...and leave this loop in.  There is an endless loop in
 	 * 'start.asm' also, if you accidently delete this next line */

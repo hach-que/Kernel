@@ -56,5 +56,13 @@ extern void kb_install();
 
 /* MEM.C */
 extern void mem_install(struct multiboot_info* mbt, unsigned int magic);
+extern void* palloc(unsigned long long int size);
+extern void pfree(void* pos, unsigned long long int size);
+unsigned int mem_getpage0usage();
+unsigned int mem_getpageusage();
+unsigned int mem_getpageavail();
+
+/* PAGE.C */
+extern void page_install();
 
 #endif

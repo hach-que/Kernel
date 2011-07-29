@@ -6,7 +6,7 @@ ARCH=i386
 ARCH_FLAGS=-march=$(ARCH) -m32
 
 # General flags for tools.
-CC_FLAGS=$(ARCH_FLAGS) -O0 -fstrength-reduce -fomit-frame-pointer -finline-functions -nostdinc -fno-builtin -I./ -c
+CC_FLAGS=$(ARCH_FLAGS) -Wall -O0 -fstrength-reduce -fomit-frame-pointer -finline-functions -nostdinc -fno-builtin -I./ -c
 LD_FLAGS=-m elf_$(ARCH)
 
 all:
@@ -35,11 +35,13 @@ all:
 	@gcc $(CC_FLAGS) -o out/kb.o kb.c
 	@echo Compiling mem.c...
 	@gcc $(CC_FLAGS) -o out/mem.o mem.c
+	@echo Compiling page.c
+	@gcc $(CC_FLAGS) -o out/page.o page.c
 	
 	@# Remember to add .o files to the end of this command
 	@# as more C source files are added.
 	@echo Linking kernel...
-	@ld $(LD_FLAGS) -T link.ld -o out/kernel.bin out/start.o out/scrn.o out/gdt.o out/idt.o out/isrs.o out/irq.o out/timer.o out/kb.o out/mem.o out/string.o out/main.o
+	@ld $(LD_FLAGS) -T link.ld -o out/kernel.bin out/start.o out/scrn.o out/gdt.o out/idt.o out/isrs.o out/irq.o out/timer.o out/kb.o out/mem.o out/string.o out/page.o out/main.o
 	@echo Copying kernel to floppy folder...
 	@cp out/kernel.bin floppy/boot/kernel.bin
 	@echo Kernel build complete.
