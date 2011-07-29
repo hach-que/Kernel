@@ -69,6 +69,7 @@ void printmem()
  * infinite loop.  This will be like our 'idle' loop */
 void _main(struct multiboot_info* mbt, unsigned int magic)
 {
+	unsigned char itoa_buffer[256];
 	void* test1 = 0;
 	void* test2 = 0;
 
@@ -86,22 +87,28 @@ void _main(struct multiboot_info* mbt, unsigned int magic)
 	kb_install();
 	init_video();
 	mem_install(mbt, magic);
-	//page_install();
+	page_install();
 
 	/* You would add commands after here */
 	puts("=== Memory tests ===\n");
 	printmem();
-	puts("Allocating 20 bytes to test1...\n");
+	puts("Allocating 20 bytes to test1... ");
 	test1 = palloc(20);
+	puts(itoa(test1, itoa_buffer, 16));
+	puts(".\n");
 	printmem();
 	puts("Freeing 20 bytes from test1...\n");
 	pfree(test1, 20);
 	printmem();
-	puts("Allocating 20 bytes to test1...\n");
+	puts("Allocating 20 bytes to test1... ");
 	test1 = palloc(20);
+	puts(itoa(test1, itoa_buffer, 16));
+	puts(".\n");
 	printmem();
-	puts("Allocating 20 bytes to test2...\n");
+	puts("Allocating 20 bytes to test2... ");
 	test2 = palloc(20);
+	puts(itoa(test2, itoa_buffer, 16));
+	puts(".\n");
 	printmem();
 	puts("Freeing 20 bytes from test1...\n");
 	pfree(test1, 20);

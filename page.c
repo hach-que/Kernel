@@ -10,8 +10,8 @@ void page_install()
 
 	/* Initalize the page directory area */
 	puts("Initializing memory for page directory... ");
-	page_directory = palloc(sizeof(unsigned int) * 1024);
-	//memset(page_directory, 0, sizeof(unsigned int) * 1024);
+	page_directory = palloc_aligned(sizeof(unsigned int) * 1024);
+	memset(page_directory, 0, sizeof(unsigned int) * 1024);
 	puts("done at 0x");
 	puts(itoa(page_directory, itoa_buffer, 16));
 	puts(".\n");

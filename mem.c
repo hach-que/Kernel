@@ -73,6 +73,7 @@ void* ralloc(unsigned int size)
 	/* We were unable to allocate any more memory
 	 * into page 0 */
 	mem_fail_msg("No more space in page 0");
+	return 0;
 }
 
 /* Frees raw memory within the 0th page */
@@ -126,6 +127,84 @@ void* palloc(unsigned long long int size)
 	
 	/* Fail if we can't allocate this memory */
 	mem_fail();
+	return 0;
+}
+
+/* Allocates a section of memory, ensuring that it is
+ * page aligned */
+void* palloc_aligned(unsigned long long int size)
+{
+	struct mem_llist* p = 0;
+	struct mem_llist* t = 0;
+	unsigned long long int s = 0;
+	unsigned char itoa_buffer[256];
+
+	/* Before we do anything else, we need to allocate
+	 * a new list element for later on (if we were to
+	 * allocate it later, then it would mess up the state
+	 * of the aligned allocation) */
+	t = palloc(sizeof(struct mem_llist));
+	memset(t, 0, sizeof(struct mem_llist));
+	t->prev = 0;
+	t->next = 0;
+	t->start = 0;
+	t->length = 0;
+
+	/* Set p now */
+	p = pages;
+
+	while (p != 0)
+	{
+		if (p->length >= size + 4096 /* ensure this section
+					      * has enough space for
+					      * any alignment that
+					      * takes place */)
+		{
+			s = (p->start & 0xFFFFF000) + 0x1000;
+
+			puts("\nbO: ");
+			puts(itoa(p->start, itoa_buffer, 16));
+			puts(" -> ");
+			puts(itoa(p->start + p->length, itoa_buffer, 16));
+
+			/* This happen a bit differently to normal
+			 * allocation; rather than simply moving
+			 * the start position, we use the new list
+			 * element we created since this new allocation
+			 * will be in the middle of an existing
+			 * free space section */
+			t->prev = p->prev;
+			t->next = p;
+			t->start = p->start;
+			t->length = s - p->start;
+
+			p->start += t->length + size;
+			p->length -= t->length + size;
+			if (pages == p)
+				pages = t;
+			else
+				p->prev->next = t;
+			p->prev = t;
+			pageusage += size;
+
+			puts("\nb1: ");
+			puts(itoa(t->start, itoa_buffer, 16));
+			puts(" -> ");
+			puts(itoa(t->start + t->length, itoa_buffer, 16));
+			puts("\nb2: ");
+			puts(itoa(p->start, itoa_buffer, 16));
+			puts(" -> ");
+			puts(itoa(p->start + p->length, itoa_buffer, 16));
+			puts("\n");
+
+			return s;
+		}
+		p = p->next;
+	}
+
+	/* Fail if we can't allocate this memory */
+	mem_fail();
+	return 0;
 }
 
 /* Frees a section of memory */
@@ -228,6 +307,9 @@ void pfree(void* pos, unsigned long long int size)
 	mem_fail_msg("Attempt to free non-existant memory");
 }
 
+/* External definitions for the end linker symbol */
+extern unsigned int end;
+
 /* Registers the memory management system */
 void mem_install(struct multiboot_info* mbt, unsigned int magic)
 {
@@ -237,20 +319,20 @@ void mem_install(struct multiboot_info* mbt, unsigned int magic)
 	struct mem_llist* p = 0;
 	unsigned char itoa_buffer[256];
 
-	/* Find the first available usable area above 1MB (so we
-	 * don't accidently run into kernel memory) */
-	puts("Searching memory map to find first available chunk... ");
+	/* Find the memory area that contains the end of the kernel
+	 * inside it */
+	puts("Searching memory map to find area with kernel end in it... ");
 	while (mmap < mbt->mmap_addr + mbt->mmap_length && page0 == 0)
 	{
-		if (mmap->base_addr >= 1024 * 1024 /* addr >= 1MB */ && mmap->type == 1 /* is it usable memory? */)
+		if (mmap->base_addr <= (unsigned long long int)(&end) && mmap->base_addr + mmap->length < (unsigned long long int)(&end) && mmap->type == 1 /* is it usable memory? */)
 		{
 			/* Set page 0 to this address and then
 			 * exit the initial loop */
 			puts("found at 0x");
-			puts(itoa(mmap->base_addr, itoa_buffer, 16));
+			puts(itoa((unsigned long long int)&end, itoa_buffer, 16));
 		       	puts(".\n");
-			page0 = mmap->base_addr;
-			pagel = mmap->length;
+			page0 = (unsigned long long int)&end;
+			pagel = mmap->length - ((unsigned long long int)&end - mmap->base_addr);
 			pagetotal += pagel - 4096;
 			break;
 		}
@@ -282,14 +364,14 @@ void mem_install(struct multiboot_info* mbt, unsigned int magic)
 	mmap = mbt->mmap_addr;
 	while (mmap < mbt->mmap_addr + mbt->mmap_length)
 	{
-		puts("\n");
+		/*puts("\n");
 		puts(itoa(mmap->base_addr, itoa_buffer, 16));
 		puts(" -> ");
 		puts(itoa(mmap->base_addr + mmap->length, itoa_buffer, 16));
 		if (mmap->type == 1)
 			puts(": USABLE");
 		else
-			puts(": NOT");
+			puts(": NOT");*/
 
 		if ((mmap->base_addr != page0 || mmap->length != pagel) && mmap->type == 1)
 		{
