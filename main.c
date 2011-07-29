@@ -1,4 +1,5 @@
 #include <system.h>
+#include <multiboot.h>
 
 /* You will need to code these up yourself! */
 unsigned char* memcpy(unsigned char* dest, const unsigned char* src, int count)
@@ -33,18 +34,6 @@ unsigned short* memsetw(unsigned short* dest, unsigned short val, int count)
 	return dest;
 }
 
-int strlen(const unsigned char* str)
-{
-	/* This loops through character array 'str', returning how
-	 * many characters it needs to check before it finds a 0.
-	 * In simple words, it returns the length in bytes of a string */
-	
-	// strlen implementation from FreeBSD 6.2
-	const unsigned char* s;
-	for (s = str; *s; ++s);
-	return (s - str);
-}
-
 /* We will use this later on for reading from the I/O ports to get data
  * from devices such as the keyboard.  We are using what is called
  * 'inline assembly' in these routines to actually do the work */
@@ -66,7 +55,7 @@ void outportb(unsigned short _port, unsigned char _data)
 
 /* This is a very simple main() function.  All it does is sit in an
  * infinite loop.  This will be like our 'idle' loop */
-void main()
+void _main(struct multiboot_info* mbt, unsigned int magic)
 {
 	/* Setup the very core components of the kernel / CPU operation */
 	gdt_install();
@@ -83,7 +72,8 @@ void main()
 
 	/* You would add commands after here */
 	init_video();
-	puts("Hello World Again!\0");
+	puts("Hello World Again!\n");
+	mem_install(mbt, magic);
 
 	/* ...and leave this loop in.  There is an endless loop in
 	 * 'start.asm' also, if you accidently delete this next line */

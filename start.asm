@@ -37,8 +37,8 @@ mboot:
 ; will insert an 'extern _main', followed by a 'call _main', right
 ; before the 'jmp $'.
 stublet:
-	extern main
-	call main
+	extern _main
+	call _main
 	jmp $
 
 ; This will set up our new segment registers.  We need to do

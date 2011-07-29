@@ -1,3 +1,5 @@
+#include <multiboot.h>
+
 #ifndef __SYSTEM_H
 #define __SYSTEM_H
 
@@ -5,9 +7,13 @@
 extern unsigned char* memcpy(unsigned char* dest, const unsigned char* src, int count);
 extern unsigned char* memset(unsigned char* dest, unsigned char val, int count);
 extern unsigned short* memsetw(unsigned short* dest, unsigned short val, int count);
-extern int strlen(const unsigned char* str);
 extern unsigned char inportb(unsigned short _port);
 extern void outportb(unsigned short _port, unsigned char _data);
+
+/* STRING.C */
+extern int strlen(const unsigned char* str);
+unsigned char* strrev(unsigned char* str);
+unsigned char* itoa(unsigned long num, unsigned char* str, int base);
 
 /* SCRN.C */
 extern void cls();
@@ -47,5 +53,8 @@ extern void timer_wait(int ticks);
 
 /* KB.C */
 extern void kb_install();
+
+/* MEM.C */
+extern void mem_install(struct multiboot_info* mbt, unsigned int magic);
 
 #endif
