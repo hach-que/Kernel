@@ -162,11 +162,6 @@ void* palloc_aligned(unsigned long long int size)
 		{
 			s = (p->start & 0xFFFFF000) + 0x1000;
 
-			puts("\nbO: ");
-			puts(itoa(p->start, itoa_buffer, 16));
-			puts(" -> ");
-			puts(itoa(p->start + p->length, itoa_buffer, 16));
-
 			/* This happen a bit differently to normal
 			 * allocation; rather than simply moving
 			 * the start position, we use the new list
@@ -186,16 +181,6 @@ void* palloc_aligned(unsigned long long int size)
 				p->prev->next = t;
 			p->prev = t;
 			pageusage += size;
-
-			puts("\nb1: ");
-			puts(itoa(t->start, itoa_buffer, 16));
-			puts(" -> ");
-			puts(itoa(t->start + t->length, itoa_buffer, 16));
-			puts("\nb2: ");
-			puts(itoa(p->start, itoa_buffer, 16));
-			puts(" -> ");
-			puts(itoa(p->start + p->length, itoa_buffer, 16));
-			puts("\n");
 
 			return s;
 		}
