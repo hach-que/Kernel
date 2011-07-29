@@ -37,6 +37,8 @@ mboot:
 ; will insert an 'extern _main', followed by a 'call _main', right
 ; before the 'jmp $'.
 stublet:
+	push eax		; Pushs the magic number onto the stack
+	push ebx		; Pushs the 32-bit address of the multiboot info structure to the stack
 	extern _main
 	call _main
 	jmp $
