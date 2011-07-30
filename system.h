@@ -69,4 +69,7 @@ addr mem_gettotal();
 /* PAGE.C */
 extern void page_install();
 
+/* TSS.C */
+extern void tss_install(int cpu_no);
+
 #endif

@@ -68,6 +68,10 @@ void printmem()
 	puts("]\n");
 }
 
+/* The definition for the entry point of the built-in userland
+ * application */
+extern void entry();
+
 /* This is a very simple main() function.  All it does is sit in an
  * infinite loop.  This will be like our 'idle' loop */
 void _main(struct multiboot_info* mbt, unsigned int magic)
@@ -81,6 +85,7 @@ void _main(struct multiboot_info* mbt, unsigned int magic)
 	idt_install();
 	isrs_install();
 	irq_install();
+	//tss_install(0);
 	
 	/* Enable IRQs */
 	__asm__ __volatile__ ("sti");
@@ -91,6 +96,14 @@ void _main(struct multiboot_info* mbt, unsigned int magic)
 	init_video();
 	mem_install(mbt, magic);
 	page_install(mem_gettotal());
+
+	/* Jump to userland */
+	//tss_to_user();
+
+	/* Run the application */
+	entry();
+
+	for (;;);
 
 	/* You would add commands after here */
 	puts("=== Memory tests ===\n");

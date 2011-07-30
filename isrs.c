@@ -35,6 +35,7 @@ extern void _isr28();
 extern void _isr29();
 extern void _isr30();
 extern void _isr31();
+extern void _isr80();
 
 /* This is a very repetitive function... it's not hard, it's
  * just annoying.  As you can see, we set the first 32 entries
@@ -78,6 +79,7 @@ void isrs_install()
 	idt_set_gate(29, (unsigned)_isr29, 0x08, 0x8E);
 	idt_set_gate(30, (unsigned)_isr30, 0x08, 0x8E);
 	idt_set_gate(31, (unsigned)_isr31, 0x08, 0x8E);
+	idt_set_gate(80, (unsigned)_isr80, 0x08, 0x8E);
 }
 
 /* This is a simple string array.  It contains the message that
@@ -138,6 +140,15 @@ void _fault_handler(struct regs *r)
 		settextcolor(4, 0);
 		puts(exception_messages[r->int_no]);
 		puts(" Exception.\nSystem Halted!\n\0");
+		for (;;);
+	}
+
+	/* Is this a fault whose number is 80? (syscall) */
+	if (r->int_no == 80)
+	{
+		putch('\n');
+		settextcolor(4, 0);
+		puts("Syscall Recognised!");
 		for (;;);
 	}
 }

@@ -31,6 +31,7 @@ global _isr28
 global _isr29
 global _isr30
 global _isr31
+global _isr80
 
 ; Interrupt service routine handlers.
 _isr0:
@@ -186,4 +187,9 @@ _isr31:
 	cli
 	push byte 0
 	push byte 31
+	jmp isr_common_stub
+_isr80:
+	cli
+	push byte 0
+	push byte 80
 	jmp isr_common_stub
