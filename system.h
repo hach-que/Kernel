@@ -3,6 +3,9 @@
 #ifndef __SYSTEM_H
 #define __SYSTEM_H
 
+/* Type definitions */
+typedef unsigned long int addr;
+
 /* MAIN.C */
 extern unsigned char* memcpy(unsigned char* dest, const unsigned char* src, int count);
 extern unsigned char* memset(unsigned char* dest, unsigned char val, int count);
@@ -56,11 +59,12 @@ extern void kb_install();
 
 /* MEM.C */
 extern void mem_install(struct multiboot_info* mbt, unsigned int magic);
-extern void* palloc(unsigned long long int size);
-extern void pfree(void* pos, unsigned long long int size);
-unsigned int mem_getpage0usage();
-unsigned int mem_getpageusage();
-unsigned int mem_getpageavail();
+extern void* palloc(addr size);
+extern void pfree(void* pos, addr size);
+addr mem_getpage0usage();
+addr mem_getpageusage();
+addr mem_getpageavail();
+addr mem_gettotal();
 
 /* PAGE.C */
 extern void page_install();

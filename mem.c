@@ -5,17 +5,18 @@
 struct mem_llist
 {
 	struct mem_llist* prev;
-	unsigned long long int start;
-	unsigned long long int length;
+	addr start;
+	addr length;
 	struct mem_llist* next;
 };
 
 /* Preallocated page to store the page frame allocation information */
-unsigned long long int page0 = 0;
+addr page0 = 0;
 unsigned char page0alloc[1024] = { };
 unsigned int page0usage = 0;
-unsigned long long int pageusage = 0;
-unsigned long long int pagetotal = 0;
+addr pageusage = 0;
+addr pagetotal = 0;
+addr memtotal = 0;
 struct mem_llist* pages = 0;
 
 /* Halts the system because there was a critical memory allocation
@@ -36,15 +37,15 @@ void mem_fail()
 }
 
 /* Allocates raw memory within the 0th page and returns it */
-void* ralloc(unsigned int size)
+void* ralloc(addr size)
 {
 	unsigned char itoa_buffer[256];
 
-	unsigned long long int pagestart = page0;
-	unsigned long long int chunkstart = 0;
+	addr pagestart = page0;
+	addr chunkstart = 0;
 	unsigned long pagelen = 4096;
 	unsigned int i = 0;
-       	unsigned int s = 0;
+       	addr s = 0;
 	for (i = 0; i < pagelen / 4; i++)
 	{
 		if (page0alloc[i] == 0 && s == 0)
@@ -62,7 +63,7 @@ void* ralloc(unsigned int size)
 			for (i = 0; i < size / 4; i++)
 				page0alloc[(chunkstart - pagestart) / 4 + i] = 1;
 			page0usage += size;
-			return chunkstart;
+			return (void*)chunkstart;
 		}
 		else if (page0alloc[i] == 1)
 			s = 0;
@@ -77,10 +78,10 @@ void* ralloc(unsigned int size)
 }
 
 /* Frees raw memory within the 0th page */
-void rfree(void* pos, unsigned int size)
+void rfree(void* pos, addr size)
 {
-	unsigned long long int pagestart = page0;
-	unsigned long long int chunkstart = pos;
+	addr pagestart = page0;
+	addr chunkstart = (addr)pos;
 	unsigned int i = 0;
 	for (i = 0; i < size / 4; i++)
 		page0alloc[(chunkstart - pagestart) / 4 + i] = 1;
@@ -88,19 +89,19 @@ void rfree(void* pos, unsigned int size)
 }
 
 /* Returns how much of the page 0 memory is in use */
-unsigned int mem_getpage0usage()
+addr mem_getpage0usage()
 {
 	return page0usage * 4;
 }
 
 /* Returns how much of the other page memory is in use */
-unsigned int mem_getpageusage()
+addr mem_getpageusage()
 {
 	return pageusage;
 }
 
 /* Returns how much memory is available in the paging system */
-unsigned int mem_getpageavail()
+addr mem_getpageavail()
 {
 	/* TODO: This should actually calculate the amount
 	 * of RAM available instead of total - usage to
@@ -108,11 +109,17 @@ unsigned int mem_getpageavail()
 	return pagetotal - pageusage;
 }
 
+/* Returns how much RAM is installed in the system */
+addr mem_gettotal()
+{
+	return memtotal;
+}
+
 /* Allocates a section of memory */
-void* palloc(unsigned long long int size)
+void* palloc(addr size)
 {
 	struct mem_llist* p = pages;
-	unsigned long long int s = 0;
+	addr s = 0;
 	while (p != 0)
 	{
 		if (p->length >= size)
@@ -120,7 +127,7 @@ void* palloc(unsigned long long int size)
 			s = p->start;
 			p->start += size;
 			pageusage += size;
-			return s;
+			return (void*)s;
 		}
 		p = p->next;
 	}
@@ -132,11 +139,11 @@ void* palloc(unsigned long long int size)
 
 /* Allocates a section of memory, ensuring that it is
  * page aligned */
-void* palloc_aligned(unsigned long long int size)
+void* palloc_aligned(addr size)
 {
 	struct mem_llist* p = 0;
 	struct mem_llist* t = 0;
-	unsigned long long int s = 0;
+	addr s = 0;
 	unsigned char itoa_buffer[256];
 
 	/* Before we do anything else, we need to allocate
@@ -144,7 +151,7 @@ void* palloc_aligned(unsigned long long int size)
 	 * allocate it later, then it would mess up the state
 	 * of the aligned allocation) */
 	t = palloc(sizeof(struct mem_llist));
-	memset(t, 0, sizeof(struct mem_llist));
+	memset((void*)t, 0, sizeof(struct mem_llist));
 	t->prev = 0;
 	t->next = 0;
 	t->start = 0;
@@ -155,13 +162,21 @@ void* palloc_aligned(unsigned long long int size)
 
 	while (p != 0)
 	{
-		if (p->length >= size + 4096 /* ensure this section
-					      * has enough space for
-					      * any alignment that
-					      * takes place */)
+		s = (p->start & 0xFFFFF000) + 0x1000;
+		if (s == p->start)
 		{
-			s = (p->start & 0xFFFFF000) + 0x1000;
-
+			/* We already have an aligned space */
+			p->start += size;
+			pageusage += size;
+			pfree(t, sizeof(struct mem_llist));
+			return (void*)s;
+		}
+		else if ((addr)(p->length) >= (addr)(size + 4096))
+			       			/* ensure this section
+						 * has enough space for
+						 * any alignment that
+						 * takes place */
+		{
 			/* This happen a bit differently to normal
 			 * allocation; rather than simply moving
 			 * the start position, we use the new list
@@ -182,7 +197,7 @@ void* palloc_aligned(unsigned long long int size)
 			p->prev = t;
 			pageusage += size;
 
-			return s;
+			return (void*)s;
 		}
 		p = p->next;
 	}
@@ -193,7 +208,7 @@ void* palloc_aligned(unsigned long long int size)
 }
 
 /* Frees a section of memory */
-void pfree(void* pos, unsigned long long int size)
+void pfree(void* pos, addr size)
 {
 	unsigned char itoa_buffer[256];
 	struct mem_llist* p = pages;
@@ -201,12 +216,12 @@ void pfree(void* pos, unsigned long long int size)
 	pageusage -= size;
 	while (p != 0)
 	{
-		if (p->prev == 0 && pos + size <= p->start)
+		if (p->prev == 0 && (addr)pos + size <= p->start)
 		{
 			/* This memory is before the start of
 			 * the first available memory (i.e. it
 			 * was allocated from the first block) */
-			if (pos + size == p->start)
+			if ((addr)pos + size == p->start)
 			{
 				/* The position + size of this free chunk
 				 * is directly before the first start
@@ -222,10 +237,10 @@ void pfree(void* pos, unsigned long long int size)
 				 * start, so we have to allocate a new
 				 * linked list element */
 				t = palloc(sizeof(struct mem_llist));
-				memset(t, 0, sizeof(struct mem_llist));
+				memset((void*)t, 0, sizeof(struct mem_llist));
 				t->prev = 0;
 				t->next = pages;
-				t->start = pos;
+				t->start = (addr)pos;
 				t->length = size;
 
 				/* Now set the global pages to t */
@@ -233,11 +248,11 @@ void pfree(void* pos, unsigned long long int size)
 				return;
 			}
 		}
-		else if (p->start + p->length <= pos && (p->next == 0 || p->next->start >= pos + size))
+		else if (p->start + p->length <= (addr)pos && (p->next == 0 || p->next->start >= (addr)pos + size))
 		{
 			/* Does this block of memory fit on the end or
 			 * start of p? */
-			if (p->start + p->length == pos)
+			if (p->start + p->length == (addr)pos)
 			{
 				/* The position of this free chunk is
 				 * on the end of the current page, so
@@ -245,7 +260,7 @@ void pfree(void* pos, unsigned long long int size)
 				p->length += size;
 				return;
 			}
-			else if (p->next != 0 && pos + size == p->next->start)
+			else if (p->next != 0 && (addr)pos + size == p->next->start)
 			{
 				/* The position + length of this chunk
 				 * is at the start of the next page, so
@@ -269,10 +284,10 @@ void pfree(void* pos, unsigned long long int size)
 				 * so we need to insert a new linked list
 				 * element */
 				t = palloc(sizeof(struct mem_llist));
-				memset(t, 0, sizeof(struct mem_llist));
+				memset((void*)t, 0, sizeof(struct mem_llist));
 				t->prev = p;
 				t->next = p->next;
-				t->start = pos;
+				t->start = (addr)pos;
 				t->length = size;
 
 				/* Adjust the surrounding elements so they
@@ -293,13 +308,13 @@ void pfree(void* pos, unsigned long long int size)
 }
 
 /* External definitions for the end linker symbol */
-extern unsigned int end;
+extern addr end;
 
 /* Registers the memory management system */
 void mem_install(struct multiboot_info* mbt, unsigned int magic)
 {
-	struct multiboot_memory_map* mmap = mbt->mmap_addr;
-	unsigned long long int pagel = 0;
+	struct multiboot_memory_map* mmap = (struct multiboot_memory_map*)mbt->mmap_addr;
+	addr pagel = 0;
 	struct mem_llist* t = 0;
 	struct mem_llist* p = 0;
 	unsigned char itoa_buffer[256];
@@ -307,17 +322,17 @@ void mem_install(struct multiboot_info* mbt, unsigned int magic)
 	/* Find the memory area that contains the end of the kernel
 	 * inside it */
 	puts("Searching memory map to find area with kernel end in it... ");
-	while (mmap < mbt->mmap_addr + mbt->mmap_length && page0 == 0)
+	while ((addr)mmap < mbt->mmap_addr + mbt->mmap_length && page0 == 0)
 	{
-		if (mmap->base_addr <= (unsigned long long int)(&end) && mmap->base_addr + mmap->length < (unsigned long long int)(&end) && mmap->type == 1 /* is it usable memory? */)
+		if (mmap->base_addr <= (addr)(&end) && mmap->base_addr + mmap->length > (addr)(&end) && mmap->type == 1 /* is it usable memory? */)
 		{
 			/* Set page 0 to this address and then
 			 * exit the initial loop */
 			puts("found at 0x");
-			puts(itoa((unsigned long long int)&end, itoa_buffer, 16));
+			puts(itoa((addr)&end, itoa_buffer, 16));
 		       	puts(".\n");
-			page0 = (unsigned long long int)&end;
-			pagel = mmap->length - ((unsigned long long int)&end - mmap->base_addr);
+			page0 = (addr)&end;
+			pagel = mmap->length - ((addr)&end - mmap->base_addr);
 			pagetotal += pagel - 4096;
 			break;
 		}
@@ -335,8 +350,8 @@ void mem_install(struct multiboot_info* mbt, unsigned int magic)
 
 	/* Alright, so now we create the list by allocating the first element */
 	puts("Creating raw page allocation list... ");
-	pages = ralloc(sizeof(struct mem_llist));
-	memset(pages, 0, sizeof(struct mem_llist));
+	pages = (struct mem_llist*)ralloc(sizeof(struct mem_llist));
+	memset((void*)pages, 0, sizeof(struct mem_llist));
 	pages->prev = 0;
 	pages->start = page0 + 4096;
 	pages->length = page0 + pagel;
@@ -346,24 +361,27 @@ void mem_install(struct multiboot_info* mbt, unsigned int magic)
 	/* Now we mark the rest of our usable memory */
 	puts("Marking the rest of usable memory in raw page allocation list... ");
 	p = pages;
-	mmap = mbt->mmap_addr;
-	while (mmap < mbt->mmap_addr + mbt->mmap_length)
+	mmap = (struct multiboot_memory_map*)mbt->mmap_addr;
+	while ((addr)mmap < mbt->mmap_addr + mbt->mmap_length)
 	{
-		/*puts("\n");
-		puts(itoa(mmap->base_addr, itoa_buffer, 16));
-		puts(" -> ");
-		puts(itoa(mmap->base_addr + mmap->length, itoa_buffer, 16));
-		if (mmap->type == 1)
-			puts(": USABLE");
-		else
-			puts(": NOT");*/
+		if ((addr)mmap->base_addr + (addr)mmap->length > memtotal)
+			memtotal = (addr)mmap->base_addr + (addr)mmap->length;
 
-		if ((mmap->base_addr != page0 || mmap->length != pagel) && mmap->type == 1)
+		if (mmap->base_addr <= (addr)(&end) && mmap->base_addr + mmap->length > (addr)(&end) && mmap->type == 1)
+		{
+			/* This memory has already been placed as the first valid area */
+		}
+		else if (mmap->base_addr == 0)
+		{
+			/* This memory should not be touched, regardless of whether it
+			 * is valid memory. */
+		}
+		else if (mmap->type == 1)
 		{
 			/* This is a usable section of memory that was not
 			 * used as page0 */
-			t = ralloc(sizeof(struct mem_llist));
-			memset(t, 0, sizeof(struct mem_llist));
+			t = (struct mem_llist*)ralloc(sizeof(struct mem_llist));
+			memset((void*)t, 0, sizeof(struct mem_llist));
 			p->next = t;
 			t->prev = p;
 			t->start = mmap->base_addr;
@@ -376,4 +394,8 @@ void mem_install(struct multiboot_info* mbt, unsigned int magic)
 		mmap = (struct multiboot_memory_map*)((unsigned int)mmap + mmap->size + sizeof(unsigned int));
 	}
 	puts("\n");
+
+	puts("Total installed RAM has been detected as: ");
+	puts(itoa(memtotal, itoa_buffer, 10));
+	puts(".\n");
 }

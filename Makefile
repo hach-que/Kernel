@@ -44,4 +44,7 @@ all:
 	@ld $(LD_FLAGS) -T link.ld -o out/kernel.bin out/start.o out/scrn.o out/gdt.o out/idt.o out/isrs.o out/irq.o out/timer.o out/kb.o out/mem.o out/string.o out/page.o out/main.o
 	@echo Copying kernel to floppy folder...
 	@cp out/kernel.bin floppy/boot/kernel.bin
+	@echo Flushing floppy drive contents...
+	@sudo /bin/umount /dev/fd0
+	@sudo /bin/mount -o users,uid=1000 /dev/fd0 floppy
 	@echo Kernel build complete.

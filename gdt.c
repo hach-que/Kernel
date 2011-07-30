@@ -56,7 +56,7 @@ void gdt_install()
 {
 	/* Setup the GDT pointer and limit */
 	_gp.limit = (sizeof(struct gdt_entry) * 3) - 1;
-	_gp.base = &gdt;
+	_gp.base = (addr)&gdt;
 
 	/* Our NULL descriptor */
 	gdt_set_gate(0, 0, 0, 0, 0);

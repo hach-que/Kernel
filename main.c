@@ -87,14 +87,14 @@ void _main(struct multiboot_info* mbt, unsigned int magic)
 	kb_install();
 	init_video();
 	mem_install(mbt, magic);
-	page_install();
+	page_install(mem_gettotal());
 
 	/* You would add commands after here */
 	puts("=== Memory tests ===\n");
 	printmem();
 	puts("Allocating 20 bytes to test1... ");
 	test1 = palloc(20);
-	puts(itoa(test1, itoa_buffer, 16));
+	puts(itoa((addr)test1, itoa_buffer, 16));
 	puts(".\n");
 	printmem();
 	puts("Freeing 20 bytes from test1...\n");
@@ -102,12 +102,12 @@ void _main(struct multiboot_info* mbt, unsigned int magic)
 	printmem();
 	puts("Allocating 20 bytes to test1... ");
 	test1 = palloc(20);
-	puts(itoa(test1, itoa_buffer, 16));
+	puts(itoa((addr)test1, itoa_buffer, 16));
 	puts(".\n");
 	printmem();
 	puts("Allocating 20 bytes to test2... ");
 	test2 = palloc(20);
-	puts(itoa(test2, itoa_buffer, 16));
+	puts(itoa((addr)test2, itoa_buffer, 16));
 	puts(".\n");
 	printmem();
 	puts("Freeing 20 bytes from test1...\n");
