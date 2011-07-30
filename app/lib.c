@@ -2,9 +2,12 @@
 
 extern void puts(unsigned char* str);
 
-addr syscall(int type, addr bx, addr cx, addr dx)
+addr syscall(int type, addr ebx, addr ecx, addr edx)
 {
-	puts("Sending interrupt 80...");
+	asm volatile("mov %0, %%eax":: "m"(type));
+	asm volatile("mov %0, %%ebx":: "m"(ebx));
+	asm volatile("mov %0, %%ecx":: "m"(ecx));
+	asm volatile("mov %0, %%edx":: "m"(edx));
 	asm volatile("int $80");
 }
 

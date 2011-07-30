@@ -142,13 +142,5 @@ void _fault_handler(struct regs *r)
 		puts(" Exception.\nSystem Halted!\n\0");
 		for (;;);
 	}
-
-	/* Is this a fault whose number is 80? (syscall) */
-	if (r->int_no == 80)
-	{
-		putch('\n');
-		settextcolor(4, 0);
-		puts("Syscall Recognised!");
-		for (;;);
-	}
 }
+

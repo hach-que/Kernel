@@ -85,7 +85,7 @@ void _main(struct multiboot_info* mbt, unsigned int magic)
 	idt_install();
 	isrs_install();
 	irq_install();
-	//tss_install(0);
+	tss_install(0);
 	
 	/* Enable IRQs */
 	__asm__ __volatile__ ("sti");
