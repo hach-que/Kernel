@@ -2,23 +2,26 @@
 #include <multiboot.h>
 
 /* You will need to code these up yourself! */
-unsigned char* memcpy(unsigned char* dest, const unsigned char* src, int count)
+void* memcpy(void* dest, const void* src, int count)
 {
 	/* Add code here to copy 'count' bytes of data from 'src' to
 	 * 'dest', finally return 'dest' */
+	unsigned char* destC = (unsigned char*)dest;
+	unsigned char* srcC = (unsigned char*)src;
 	int i;
 	for (i = 0; i < count; i++)
-		dest[i] = src[i];
+		destC[i] = srcC[i];
 	return dest;
 }
 
-unsigned char* memset(unsigned char* dest, unsigned char val, int count)
+void* memset(void* dest, unsigned char val, int count)
 {
 	/* Add code here to set 'count' bytes in 'dest' to 'val'.
 	 * Again, return 'dest' */
+	unsigned char* destC = (unsigned char*)dest;
 	int i;
 	for (i = 0; i < count; i++)
-		dest[i] = val;
+		destC[i] = val;
 	return dest;
 }
 
