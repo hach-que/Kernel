@@ -25,7 +25,12 @@ addr* page_table_new(addr address, addr flags)
 /* Handles setting the page directory */
 void page_switch(addr* dir)
 {
-
+	unsigned int cr0;
+	page_directory = dir;
+	asm volatile("mov %0, %%cr3":: "b"(page_directory));
+	asm volatile("mov %%cr0, %0": "=b"(cr0));
+	cr0 |= 0x80000000;
+	asm volatile("mov %0, %%cr0":: "b"(cr0));
 }
 
 /* Handles a page fault */
@@ -62,7 +67,6 @@ void _page_fault(struct regs *r)
 void page_install(addr upper)
 {
 	unsigned char itoa_buffer[256];
-	unsigned int cr0;
 	int i = 0;
 
 	/* Detect if paging should not be enabled */
@@ -74,10 +78,10 @@ void page_install(addr upper)
 
 	/* Initalize the page directory area */
 	puts("Initializing memory for page directory... ");
-	page_directory = (addr*)palloc_aligned(sizeof(addr) * 1024);
-	memset((void*)page_directory, 0, sizeof(addr) * 1024);
+	kernel_directory = (addr*)palloc_aligned(sizeof(addr) * 1024);
+	memset((void*)kernel_directory, 0, sizeof(addr) * 1024);
 	puts("done at 0x");
-	puts(itoa((addr)page_directory, itoa_buffer, 16));
+	puts(itoa((addr)kernel_directory, itoa_buffer, 16));
 	puts(".\n");
 
 	/* Set the initial state of the page directory */
@@ -85,7 +89,7 @@ void page_install(addr upper)
 	for (i = 0; i < 1024; i++)
 	{
 		/* Attributes: supervisor level, read/write, not present */
-		page_directory[i] = 0 | 2;
+		kernel_directory[i] = 0 | 2;
 	}
 	puts("done.\n");
 
@@ -97,20 +101,13 @@ void page_install(addr upper)
 		puts("MB - ");
 		puts(itoa((i + 1) * 4, itoa_buffer, 10));
 		puts("MB... ");
-		page_directory[i]  = (addr)page_table_new(i * 4 * 1024 * 1024, 3);
-		page_directory[i] |= 3;
+		kernel_directory[i]  = (addr)page_table_new(i * 4 * 1024 * 1024, 3);
+		kernel_directory[i] |= 3;
 		puts("done.\n");
 	}
 
-	/* This is the kernel page directory, so
-	 * set that correctly */
-	kernel_directory = page_directory;
-
-	/* Enable paging */
+	/* Now enable paging */
 	puts("Enabling paging... ");
-	asm volatile("mov %0, %%cr3":: "b"(page_directory));
-	asm volatile("mov %%cr0, %0": "=b"(cr0));
-	cr0 |= 0x80000000;
-	asm volatile("mov %0, %%cr0":: "b"(cr0));
+	page_switch(kernel_directory);
 	puts("done.\n");
 }

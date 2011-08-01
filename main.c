@@ -6,6 +6,7 @@
 #include <idt.h>
 #include <isrs.h>
 #include <tss.h>
+#include <process.h>
 
 #include <timer.h>
 #include <scrn.h>
@@ -108,10 +109,9 @@ void _main(struct multiboot_info* mbt, unsigned int magic)
 	mem_install(mbt, magic);
 	page_install(mem_gettotal());
 
-	/* Jump to userland */
-	tss_to_user();
-
-	/* Run the application */
+	/* "Start" a new process */
+	struct process* proc = process_new();
+	process_enter(proc);
 	entry();
 
 	for (;;);
