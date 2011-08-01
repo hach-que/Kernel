@@ -1,7 +1,10 @@
 #include <system.h>
-#include <process.h>
+#include <task.h>
 #include <tss.h>
 #include <mem.h>
+
+/* Clones a page directory */
+addr* clone_directory
 
 /* Handles the creation of new virtual memory for a
  * process and returns it */

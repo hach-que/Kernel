@@ -101,26 +101,28 @@ extern _irq_handler
 ; This is a stub that we have created for IRQ based ISRs.  This calls
 ; '_irq_handler' in our C code.  We need to create this in an 'irq.c'
 irq_common_stub:
-	pusha
-	push ds
-	push es
-	push fs
-	push gs
-	mov ax, 0x10
-	mov ds, ax
-	mov es, ax
-	mov fs, ax
-	mov gs, ax
-	mov eax, esp
-	push eax
-	mov eax, _irq_handler
-	call eax
-	pop eax
-	pop gs
-	pop fs
-	pop es
-	pop ds
-	popa
-	add esp, 8
-	iret
+        pusha           ; Pushes edi, esi, ebp, esp, ebx, edx, ecx,
+                        ; eax
 
+        mov ax, ds      ; Lower 16-bits of eax = ds
+        push eax        ; Save the data segment descriptor
+
+        mov ax, 0x10    ; Load the kernel data segment descriptor
+        mov ds, ax
+        mov es, ax
+        mov fs, ax
+        mov gs, ax
+
+        call _irq_handler
+
+        pop eax         ; Reload the original data segment descriptor
+        mov ds, ax
+        mov es, ax
+        mov fs, ax
+        mov gs, ax
+
+        popa            ; Pops edi, esi, ebp...
+        add esp, 8      ; Cleans up pushed error code and pushed ISR
+                        ; number.
+        sti
+        iret            ; Pops 5 things at once: CS, EIP, EFLAGS, SS and ESP!

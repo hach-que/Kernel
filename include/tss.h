@@ -1,9 +1,6 @@
 #ifndef __TSS_H
 #define __TSS_H
 
-/* Based off the "Getting to User Mode" tutorial on
- * http://www.germsoft.com/Software/OS/Tut/Html/um.html */
-
 typedef volatile struct tss
 {
 	unsigned short link;
@@ -62,7 +59,9 @@ typedef volatile struct tss
 } __attribute__((packed)) tss_t;
 
 /* TSS.C */
-extern void tss_install(int cpu_no);
+extern void tss_set_kernel_stack(unsigned int stack);
+extern void tss_install(signed int num, unsigned short ss0, unsigned short esp0);
+extern void tss_to_user();
 
 #endif
 

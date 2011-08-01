@@ -2,8 +2,8 @@
 #include <isrs.h>
 #include <page.h>
 
-addr* page_directory = 0;
-addr* kernel_directory = 0;
+struct page_directory* current_directory = 0;
+struct page_directory* kernel_directory = 0;
 
 /* Maps the block address + 4MB into the paging system
  * with the specified flags set.  Returns the address
@@ -34,7 +34,7 @@ void page_switch(addr* dir)
 }
 
 /* Handles a page fault */
-void _page_fault(struct regs *r)
+void _page_fault(struct regs* r)
 {
 	/* Get the fault location */
 	addr fault_location;
@@ -78,8 +78,9 @@ void page_install(addr upper)
 
 	/* Initalize the page directory area */
 	puts("Initializing memory for page directory... ");
-	kernel_directory = (addr*)palloc_aligned(sizeof(addr) * 1024);
-	memset((void*)kernel_directory, 0, sizeof(addr) * 1024);
+	kernel_directory = (struct page_directory*)kmalloc_a(sizeof(struct page_directory));
+	memset(kernel_directory, 0, sizeof(struct page_directory));
+	current_directory = kernel_directory;
 	puts("done at 0x");
 	puts(itoa((addr)kernel_directory, itoa_buffer, 16));
 	puts(".\n");

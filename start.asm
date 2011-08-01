@@ -61,6 +61,18 @@ _gdt_flush:
 flush2:
 	ret		; Returns back to the C code!
 
+; This will refresh the TSS for the processor.
+global _tss_flush	; Allows the C code to link to this
+_tss_flush:
+	mov ax, 0x2B	; Load the index of our TSS structure
+			; The index is 0x28 as it is the 5th
+			; selector and each is 8 bytes long,
+			; but we set the bottom two bits (making
+			; 0x2B) so that is has an RPL of 3,
+			; not zero.
+	ltr ax		; Load 0x2B into the task state register
+	ret
+
 ; Loads the IDT defined in '_idtp' into the processor.
 ; This is declared in C as 'extern void _idt_load();'
 global _idt_load

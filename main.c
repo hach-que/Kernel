@@ -97,7 +97,6 @@ void _main(struct multiboot_info* mbt, unsigned int magic)
 	idt_install();
 	isrs_install();
 	irq_install();
-	tss_install(0);
 	
 	/* Enable IRQs */
 	__asm__ __volatile__ ("sti");
@@ -110,8 +109,9 @@ void _main(struct multiboot_info* mbt, unsigned int magic)
 	page_install(mem_gettotal());
 
 	/* "Start" a new process */
-	struct process* proc = process_new();
-	process_enter(proc);
+	//struct process* proc = process_new();
+	//process_enter(proc);
+	tss_to_user();
 	entry();
 
 	for (;;);

@@ -126,7 +126,7 @@ unsigned char* exception_messages[] =
 /* All of the externally defined fault handlers that we don't
  * want the entire kernel to see.. probably could put these in
  * a header file though */
-extern void _page_fault(struct regs *r);
+extern void _page_fault(struct regs* r);
 
 /* All of our Exception handling Interrupt Service Routines will
  * point to this function.  This will tell us what exception has
@@ -134,14 +134,18 @@ extern void _page_fault(struct regs *r);
  * endless loop.  All ISRs disable interrupts while they are being
  * serviced as a 'locking' mechanism to prevent an IRQ from
  * happening and messing up kernel data structures */
-void _fault_handler(struct regs *r)
+void _fault_handler(struct regs r)
 {
 	/* Is this a fault we want to handle? */
-	switch (r->int_no)
+	switch (r.int_no)
 	{
 		case 14:
 			/* Page fault; send to page.c */
-			_page_fault(r);
+			_page_fault(&r);
+			return;
+		case 80:
+			/* System call; send to syscall.c */
+			_syscall_handler(&r);
 			return;
 		default:
 			/* Not something we want to handle
@@ -151,14 +155,14 @@ void _fault_handler(struct regs *r)
 	}
 
 	/* Is this a fault whose number is from 0 to 31? */
-	if (r->int_no < 32)
+	if (r.int_no < 32)
 	{
 		/* Display the description for the Exception that
 		 * occurred.  In this tutorial, we will simply halt
 		 * the system using an infinite loop. */
 		putch('\n');
 		settextcolor(4, 0);
-		puts(exception_messages[r->int_no]);
+		puts(exception_messages[r.int_no]);
 		puts(" Exception.\nSystem Halted!\n\0");
 		for (;;);
 	}

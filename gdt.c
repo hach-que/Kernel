@@ -1,5 +1,6 @@
 #include <system.h>
 #include <gdt.h>
+#include <tss.h>
 
 /* Defines a GDT entry.  We say packed, because it prevents the
  * compiler from doing things that it thinks is best, i.e.
@@ -49,14 +50,14 @@ void gdt_set_gate(int num, unsigned long base, unsigned long limit, unsigned cha
 }
 
 /* Should be called by main.  This will setup the special GDT
- * pointer, set up the first 3 entries in our GDT, and then finally
+ * pointer, set up the 6 entries in our GDT, and then finally
  * call gdt_flush() in our assembler file in order to tell
  * the processor where the new GDT is and update the new segment
  * registers. */
 void gdt_install()
 {
 	/* Setup the GDT pointer and limit */
-	_gp.limit = (sizeof(struct gdt_entry) * 3) - 1;
+	_gp.limit = (sizeof(struct gdt_entry) * 6) - 1;
 	_gp.base = (addr)&gdt;
 
 	/* Our NULL descriptor */
@@ -74,6 +75,14 @@ void gdt_install()
 	 * this entry's access byte says it's a Data Segment */
 	gdt_set_gate(2, 0, 0xFFFFFFFF, 0x92, 0xCF);
 
-	/* Flush our the old GDT and install the new changes! */
+	/* Install the user mode segments into the GDT */
+	gdt_set_gate(3, 0, 0xFFFFFFFF, 0xFA, 0xCF);
+	gdt_set_gate(4, 0, 0xFFFFFFFF, 0xF2, 0xCF);
+
+	/* Install the TSS and user mode segments into the GDT */
+	tss_install(5, 0x10, 0x0);
+
+	/* Flush our the old GDT / TSS and install the new changes! */
 	_gdt_flush();
+	_tss_flush();
 }

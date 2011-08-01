@@ -1,17 +1,14 @@
 #include "kernel.h"
 
-extern void puts(unsigned char* str);
-
-addr syscall(int type, addr ebx, addr ecx, addr edx)
+int syscall(int type, addr p1, addr p2, addr p3, addr p4, addr p5)
 {
-	asm volatile("mov %0, %%eax":: "m"(type));
-	asm volatile("mov %0, %%ebx":: "m"(ebx));
-	asm volatile("mov %0, %%ecx":: "m"(ecx));
-	asm volatile("mov %0, %%edx":: "m"(edx));
-	asm volatile("int $80");
+	int a;
+	asm volatile("int $0x80" : "=a" (a) : "0" (type), "b" ((int)p1), "c" ((int)p2),
+			"d" ((int)p3), "S" ((int)p4), "D" ((int)p5));
+	return a;
 }
 
 void write(const char* msg)
 {
-	syscall(1, (addr)msg, 0, 0);
+	syscall(0, (addr)msg, 0, 0, 0, 0);
 }

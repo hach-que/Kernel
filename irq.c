@@ -95,21 +95,21 @@ void irq_install()
  * the interrupt at BOTH controllers, otherwise, you only
  * send an EOI command to the first controller.  If you
  * don't send an EOI, you won't raise any more IRQs */
-void _irq_handler(struct regs* r)
+void _irq_handler(struct regs r)
 {
 	/* This is a blank function pointer */
 	void (*handler)(struct regs* r);
 
 	/* Find out if we have a custom handler to run
 	 * for this IRQ, and then finally, run it */
-	handler = irq_routines[r->int_no - 32];
+	handler = irq_routines[r.int_no - 32];
 	if (handler)
-		handler(r);
+		handler(&r);
 
 	/* If the IDT entry that was invoked was greater
 	 * than 40 (meaning IRQ8 - 15), then we need to
 	 * send an EOI to the slave controller */
-	if (r->int_no >= 40)
+	if (r.int_no >= 40)
 		outportb(0xA0, 0x20);
 
 	/* In either case, we need to send an EOI to the

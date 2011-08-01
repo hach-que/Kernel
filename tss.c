@@ -6,29 +6,48 @@
 
 tss_t sys_tss;
 
-void tss_install(int cpu_no)
+/* Refreshs the TSS location within the GDT so the
+ * processor knows where to find it */
+extern void _tss_flush();
+
+/* Sets the kernel stack */
+void tss_set_kernel_stack(unsigned int stack)
 {
-	/* Now fill each value, setting values as
-	 * necessary */
-	sys_tss.ss0 = 0x10;
+	sys_tss.esp0 = stack;
+}
 
-	/* Now set the IO bitmap (not necessary, so set
-	 * above limit */
-	sys_tss.iomap = (unsigned short) sizeof(tss_t);
+/* Installs the TSS and user mode descriptors into the
+ * GDT */
+void tss_install(signed int num, unsigned short ss0, unsigned short esp0)
+{
+	/* Computer the base and limit of our entry into
+	 * the GDT */
+	addr base = (addr)&sys_tss;
+	addr size = base + sizeof(tss_t);
 
-	/* The fourth entry in our GDT is for our User
-	 * Mode Code Segment */
-	gdt_set_gate(3, 0, 0xFFFFFFFF, 0xFA, 0xCF);
+	/* Add the TSS's descriptor to the GDT */
+	gdt_set_gate(num, base, size, 0xE9, 0x00);
 
-	/* The fifth entry in our GDT is for our User
-	 * Mode Data Segment */
-	gdt_set_gate(4, 0, 0xFFFFFFFF, 0xF2, 0xCF);
+	/* Ensure the descriptor is initially zero */
+	memset(&sys_tss, 0, sizeof(sys_tss));
 
-	/* The sixth entry in the GDT is for the Task
-	 * State Segment */
-	unsigned long address = (unsigned long)&sys_tss;
-	int size = sizeof(tss_t) + 1;
-	gdt_set_gate(5, address, address + size, 0x89, 0xCF);
+	/* Set the default kernel stack segments and
+	 * pointer positions */
+	sys_tss.ss0	= ss0;
+	sys_tss.esp0	= esp0;
+
+	/* Here we should set the cs, ss, ds, es, fs and gs
+	 * entries in the TSS.  These specify what segemnts
+	 * should be loaded when the processor switches to
+	 * kernel mode.  Therefore, they are just our normal
+	 * kernel code/data segments - 0x08 and 0x10
+	 * respectively, but with the last two bits set,
+	 * making 0x0b and 0x13.  The setting of these bits
+	 * sets the RPL (requested privilege level) to 3,
+	 * meaning that this TSS can be used to switch to 
+	 * kernel mode from ring 3 */
+	sys_tss.cs = 0x0B;
+	sys_tss.ss = sys_tss.ds = sys_tss.es = sys_tss.fs = sys_tss.gs = 0x13;
 }
 
 /* Jumps the system to user mode */
