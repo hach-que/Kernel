@@ -1,3 +1,6 @@
+#ifndef __TSS_H
+#define __TSS_H
+
 /* Based off the "Getting to User Mode" tutorial on
  * http://www.germsoft.com/Software/OS/Tut/Html/um.html */
 
@@ -57,4 +60,9 @@ typedef volatile struct tss
 	unsigned short trap;
 	unsigned short iomap;
 } __attribute__((packed)) tss_t;
+
+/* TSS.C */
+extern void tss_install(int cpu_no);
+
+#endif
 

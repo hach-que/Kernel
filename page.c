@@ -1,6 +1,9 @@
 #include <system.h>
+#include <isrs.h>
+#include <page.h>
 
 addr* page_directory = 0;
+addr* kernel_directory = 0;
 
 /* Maps the block address + 4MB into the paging system
  * with the specified flags set.  Returns the address
@@ -17,6 +20,42 @@ addr* page_table_new(addr address, addr flags)
 		address += 4096; /* Advanced the address to the next page boundry */
 	}
 	return table;
+}
+
+/* Handles setting the page directory */
+void page_switch(addr* dir)
+{
+
+}
+
+/* Handles a page fault */
+void _page_fault(struct regs *r)
+{
+	/* Get the fault location */
+	addr fault_location;
+	asm volatile("mov %%cr2, %0" : "=r" (fault_location));
+	unsigned char itoa_buffer[256];
+	
+	/* Determine the type of fault that occurred */
+	int present  = !(r->err_code & 0x1);	// Page not present
+	int rw       = r->err_code & 0x2;	// Write operation?
+	int us       = r->err_code & 0x4;	// Processor was in user-mode?
+	int reserved = r->err_code & 0x8;	// Overwritten CPU-reserved bits
+						// of page entry?
+	int id       = r->err_code & 0x10;	// Caused by an instruction fetch?
+
+	/* Output an error message */
+	putch('\n');
+	settextcolor(4, 0);
+	puts("Page Fault ( ");
+	if (present) puts("present ");
+	if (rw) puts("read-only ");
+	if (us) puts("user-mode ");
+	if (reserved) puts("reserved ");
+	puts(") at 0x");
+	puts(itoa(fault_location, itoa_buffer, 16));
+	puts(".\nSystem Halted!\n\0");
+	for (;;);
 }
 
 /* Installs the paging system */
@@ -50,7 +89,7 @@ void page_install(addr upper)
 	}
 	puts("done.\n");
 
-	/* Create the first page table */
+	/* Create the page tables */
 	for (i = 0; i < upper / (4 * 1024 * 1024); i += 1)
 	{
 		puts("Initializing page table for ");
@@ -62,6 +101,10 @@ void page_install(addr upper)
 		page_directory[i] |= 3;
 		puts("done.\n");
 	}
+
+	/* This is the kernel page directory, so
+	 * set that correctly */
+	kernel_directory = page_directory;
 
 	/* Enable paging */
 	puts("Enabling paging... ");

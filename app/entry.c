@@ -1,4 +1,4 @@
-#include <app/kernel.h>
+#include "kernel.h"
 
 int entry()
 {

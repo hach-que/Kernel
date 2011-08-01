@@ -1,4 +1,5 @@
 #include <system.h>
+#include <scrn.h>
 
 /* These define our textpointer, our background and foreground
  * colors (attributes), and x and y cursor coordinates */

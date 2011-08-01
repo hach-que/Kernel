@@ -1,4 +1,5 @@
 #include <system.h>
+#include <isrs.h>
 
 /* These are function prototypes for all of the exception
  * handlers: The first 32 entries in the IDT are reserved
@@ -122,6 +123,11 @@ unsigned char* exception_messages[] =
 	"Reserved"
 };
 
+/* All of the externally defined fault handlers that we don't
+ * want the entire kernel to see.. probably could put these in
+ * a header file though */
+extern void _page_fault(struct regs *r);
+
 /* All of our Exception handling Interrupt Service Routines will
  * point to this function.  This will tell us what exception has
  * happened!  Right now, we simply halt the system by hitting an
@@ -130,6 +136,20 @@ unsigned char* exception_messages[] =
  * happening and messing up kernel data structures */
 void _fault_handler(struct regs *r)
 {
+	/* Is this a fault we want to handle? */
+	switch (r->int_no)
+	{
+		case 14:
+			/* Page fault; send to page.c */
+			_page_fault(r);
+			return;
+		default:
+			/* Not something we want to handle
+			 * specially, so let it fall through
+			 * to the if statement below */
+			break;
+	}
+
 	/* Is this a fault whose number is from 0 to 31? */
 	if (r->int_no < 32)
 	{

@@ -6,7 +6,7 @@ ARCH=i386
 ARCH_FLAGS=-march=$(ARCH) -m32
 
 # General flags for tools.
-CC_FLAGS=$(ARCH_FLAGS) -O0 -fstrength-reduce -fomit-frame-pointer -finline-functions -nostdinc -fno-builtin -I./ -c
+CC_FLAGS=$(ARCH_FLAGS) -O0 -fstrength-reduce -fomit-frame-pointer -finline-functions -nostdinc -fno-builtin -I./include/ -c
 LD_FLAGS=-m elf_$(ARCH)
 
 all:

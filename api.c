@@ -1,4 +1,5 @@
 #include <system.h>
+#include <api.h>
 
 /* Handles a system call made by the userland code */
 void _syscall_handler()

@@ -1,4 +1,8 @@
 #include <system.h>
+#include <irq.h>
+#include <kb.h>
+
+/* Keyboard constants */
 #define KB_SHIFT 0x11
 #define KB_ALT 0x12
 #define KB_CTRL 0x13

@@ -1,4 +1,5 @@
 #include <system.h>
+#include <string.h>
 
 /* String length function */
 int strlen(const unsigned char* str)

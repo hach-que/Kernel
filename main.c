@@ -1,5 +1,16 @@
 #include <system.h>
+
 #include <multiboot.h>
+#include <main.h>
+#include <gdt.h>
+#include <idt.h>
+#include <isrs.h>
+#include <tss.h>
+
+#include <timer.h>
+#include <scrn.h>
+#include <mem.h>
+#include <page.h>
 
 /* You will need to code these up yourself! */
 void* memcpy(void* dest, const void* src, int count)
@@ -98,7 +109,7 @@ void _main(struct multiboot_info* mbt, unsigned int magic)
 	page_install(mem_gettotal());
 
 	/* Jump to userland */
-	//tss_to_user();
+	tss_to_user();
 
 	/* Run the application */
 	entry();

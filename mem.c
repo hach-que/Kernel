@@ -1,4 +1,5 @@
 #include <system.h>
+#include <mem.h>
 #include <multiboot.h>
 
 /* Linked list structure for memory page allocate */
