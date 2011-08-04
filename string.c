@@ -1,5 +1,6 @@
 #include <system.h>
 #include <string.h>
+#include <main.h>
 
 /* String length function */
 int strlen(const unsigned char* str)
@@ -12,6 +13,24 @@ int strlen(const unsigned char* str)
 	const unsigned char* s;
 	for (s = str; *s; ++s);
 	return (s - str);
+}
+
+/* String copy function */
+int strcpy(unsigned char* dest, const unsigned char* src, unsigned int size)
+{
+	memcpy(dest, src, size);
+}
+
+/* String compare function */
+int strcmp(const unsigned char* a, const unsigned char* b)
+{
+	int i = 0;
+	if (strlen(a) > strlen(b)) return 1;
+	if (strlen(a) < strlen(b)) return -1;
+	for (i = 0; i < strlen(a); i++)
+		if (a[i] != b[i])
+			return (a[i] > b[i]) ? 1 : -1;
+	return 0;
 }
 
 /* String reverse function

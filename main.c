@@ -11,6 +11,9 @@
 #include <scrn.h>
 #include <page.h>
 
+#include <vfs.h>
+#include <initrd.h>
+
 /* You will need to code these up yourself! */
 void* memcpy(void* dest, const void* src, int count)
 {
@@ -105,67 +108,34 @@ void _main(struct multiboot_info* mbt, unsigned int magic)
 	kb_install();
 	init_video();
 
-	puts("total: 0x");
-	puts(itoa(kmem_total(), itoa_buffer, 16));
-	puts("\n");
+	/* Install the initrd filesystem so we can use it */
+	ASSERT(mbt->mods_count > 0);
+	fs_root = initrd_install(*((unsigned int*)(mbt->mods_addr)));
+	
+	/* List the contents of the initrd */
+	int i = 0;
+	struct dirent* node = 0;
+	while ((node = readdir_fs(fs_root, i)) != 0)
+	{
+		puts("Found file ");
+		puts(node->name);
+		struct fs_node* fsnode = finddir_fs(fs_root, node->name);
 
-	addr a = kmalloc(8);
-	puts("a: 0x");
-	puts(itoa(a, itoa_buffer, 16));
-	puts("\n");
-
-	page_install(kmem_total());
-	addr b = kmalloc(8);
-	addr c = kmalloc(8);
-	puts("a: 0x");
-	puts(itoa(a, itoa_buffer, 16));
-	puts(", b: 0x");
-	puts(itoa(b, itoa_buffer, 16));
-	puts("\nc: 0x");
-	puts(itoa(c, itoa_buffer, 16));
-	kfree(c);
-	kfree(b);
-	addr d = kmalloc(12);
-	puts(", d: 0x");
-	puts(itoa(d, itoa_buffer, 16));
-
-
-	/* "Start" a new process */
-	//struct process* proc = process_new();
-	//process_enter(proc);
-	//tss_to_user();
-	//entry();
-
-	for (;;);
-
-	/* You would add commands after here */
-	puts("=== Memory tests ===\n");
-	printmem();
-	puts("Allocating 20 bytes to test1... ");
-	test1 = palloc(20);
-	puts(itoa((addr)test1, itoa_buffer, 16));
-	puts(".\n");
-	printmem();
-	puts("Freeing 20 bytes from test1...\n");
-	pfree(test1, 20);
-	printmem();
-	puts("Allocating 20 bytes to test1... ");
-	test1 = palloc(20);
-	puts(itoa((addr)test1, itoa_buffer, 16));
-	puts(".\n");
-	printmem();
-	puts("Allocating 20 bytes to test2... ");
-	test2 = palloc(20);
-	puts(itoa((addr)test2, itoa_buffer, 16));
-	puts(".\n");
-	printmem();
-	puts("Freeing 20 bytes from test1...\n");
-	pfree(test1, 20);
-	printmem();
-	puts("Freeing 20 bytes from test2...\n");
-	pfree(test2, 20);
-	printmem();
-
+		if ((fsnode->flags & 0x7) == FS_DIRECTORY)
+			puts("\n\t(directory)\n");
+		else
+		{
+			puts("\n\t contents: \"");
+			char buf[256];
+			unsigned int sz = read_fs(fsnode, 0, 256, buf);
+			int j;
+			for (j = 0; j < sz; j++)
+				putch(buf[j]);
+			puts("\"\n");
+		}
+		i++;
+	}
+	
 	/* ...and leave this loop in.  There is an endless loop in
 	 * 'start.asm' also, if you accidently delete this next line */
 	for (;;);

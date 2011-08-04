@@ -99,7 +99,7 @@ static void expand(addr new_size, struct vmem_heap* heap)
 
 	while (i < new_size)
 	{
-		frame_alloc( get_page(heap->start_address+i, 1, kernel_directory),
+		frame_alloc( (struct page*)get_page(heap->start_address+i, 1, kernel_directory),
 				(heap->supervisor)?1:0, (heap->readonly)?0:1);
 		i += 0x1000; /* page size */
 	}
@@ -126,7 +126,7 @@ static addr contract(addr new_size, struct vmem_heap* heap)
 	addr i = old_size;
 	while (new_size < i)
 	{
-		frame_free(get_page(heap->start_address + i, 0, kernel_directory));
+		frame_free((struct page*)get_page(heap->start_address + i, 0, kernel_directory));
 		i -= 0x1000;
 	}
 	heap->end_address = heap->start_address + new_size;

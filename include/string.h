@@ -3,7 +3,9 @@
 
 /* STRING.C */
 extern int strlen(const unsigned char* str);
-unsigned char* strrev(unsigned char* str);
-unsigned char* itoa(unsigned long num, unsigned char* str, int base);
+extern int strcpy(unsigned char* dest, const unsigned char* src, unsigned int size);
+extern int strcmp(const unsigned char* a, const unsigned char* b);
+extern unsigned char* strrev(unsigned char* str);
+extern unsigned char* itoa(unsigned long num, unsigned char* str, int base);
 
 #endif

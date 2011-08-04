@@ -16,7 +16,7 @@ static addr kmalloc_i(addr size, int align, addr* phys)
 		void* address = vmalloc(size, (unsigned char)align, kmem_heap);
 		if (phys != 0)
 		{
-			struct page* p = get_page((addr)address, 0, kernel_directory);
+			struct page* p = (struct page*)get_page((addr)address, 0, kernel_directory);
 			*phys = p->frame*0x1000 + (addr)address&0xFFF;
 		}
 		return (addr)address;
@@ -80,4 +80,7 @@ void kmem_install(struct multiboot_info* mbt)
 
 		mmap = (struct multiboot_memory_map*)((addr)mmap + mmap->size + sizeof(addr));
 	}
+
+	/* Adjust kmem_addr for multiboot module information */
+	kmem_addr += mbt->mods_count * sizeof(unsigned int);
 }
