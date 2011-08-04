@@ -51,6 +51,7 @@ static addr first_frame()
 			}
 		}
 	}
+	return (addr) - 1;
 }
 
 /* Function to allocate a frame */

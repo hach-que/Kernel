@@ -41,7 +41,8 @@ void page_switch(struct page_directory* dir)
 {
 	unsigned int cr0;
 	current_directory = dir;
-	asm volatile("mov %0, %%cr3":: "r"(&dir->phys_addr));
+
+	asm volatile("mov %0, %%cr3":: "r"(&dir->tables_phys));
 	asm volatile("mov %%cr0, %0": "=r"(cr0));
 	cr0 |= 0x80000000;
 	asm volatile("mov %0, %%cr0":: "r"(cr0));
@@ -90,10 +91,16 @@ void page_install(addr upper)
 		return;
 	}
 
+	addr memend = kmem_total();
+
 	/* Set the frames and frame count */
-	nframes = end / 0x1000;
+	puts("Initializing physical frames... ");
+	nframes = memend / 0x1000;
 	frames = (unsigned int*)kmalloc(INDEX_FROM_BIT(nframes));
 	memset(frames, 0, INDEX_FROM_BIT(nframes));
+	puts("done (");
+	puts(itoa(nframes, itoa_buffer, 10));
+	puts(").\n");
 
 	/* Initalize the page directory area */
 	puts("Initializing memory for page directory... ");
@@ -105,11 +112,13 @@ void page_install(addr upper)
 	puts(".\n");
 
 	/* Map some pages in the kernel heap area */
+	i = 0;
 	for (i = VMEM_START; i < VMEM_START + VMEM_INITIAL_SIZE; i += 0x1000)
 		get_page(i, 1, kernel_directory);
 
 	/* Set the initial state of the page directory */
 	puts("Initializing contents of page directory... ");
+	i = 0;
 	while (i < kmem_addr + 0x1000)
 	{
 		/* Kernel code is readable but not writable from userspace */

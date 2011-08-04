@@ -16,7 +16,7 @@ typedef struct page
 struct page_table
 {
 	struct page pages[1024];
-};
+} __attribute__((packed));
 
 struct page_directory
 {
@@ -33,7 +33,7 @@ struct page_directory
 	 * and the directory may be in a different location
 	 * in virtual memory */
 	addr phys_addr;
-};
+} __attribute__((packed));
 
 extern struct page_directory* current_directory;
 extern struct page_directory* kernel_directory;
@@ -42,6 +42,5 @@ extern struct page_directory* kernel_directory;
 extern void page_install();
 extern void page_switch(struct page_directory* dir);
 extern page_t page_get(addr address, int make, struct page_directory* dir);
-extern addr* page_table_new(addr address, addr flags);
 
 #endif
