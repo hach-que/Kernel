@@ -35,6 +35,9 @@ struct page_directory
 	addr phys_addr;
 };
 
+extern struct page_directory* current_directory;
+extern struct page_directory* kernel_directory;
+
 /* PAGE.C */
 extern void page_install();
 extern void page_switch(struct page_directory* dir);

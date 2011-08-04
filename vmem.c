@@ -1,402 +1,350 @@
 #include <system.h>
-#include <mem.h>
-#include <multiboot.h>
+#include <frame.h>
+#include <vmem.h>
+#include <page.h>
 
-/* Linked list structure for memory page allocate */
-struct mem_llist
+static signed int find_smallest_hole(addr size, unsigned char page_align, struct vmem_heap* heap)
 {
-	struct mem_llist* prev;
-	addr start;
-	addr length;
-	struct mem_llist* next;
-};
-
-/* Preallocated page to store the page frame allocation information */
-addr page0 = 0;
-unsigned char page0alloc[1024] = { };
-unsigned int page0usage = 0;
-addr pageusage = 0;
-addr pagetotal = 0;
-addr memtotal = 0;
-struct mem_llist* pages = 0;
-
-/* Halts the system because there was a critical memory allocation
- * failure within the kernel */
-void mem_fail_msg(unsigned char* msg)
-{
-	putch('\n');
-	settextcolor(4, 0);
-	puts("Kernel Memory Exception.  System Halted!\n");
-	puts("Specific reason: ");
-	puts(msg);
-	puts(".\n");
-	for (;;);
-}
-void mem_fail()
-{
-	mem_fail_msg("Out of Memory");
-}
-
-/* Allocates raw memory within the 0th page and returns it */
-void* ralloc(addr size)
-{
-	unsigned char itoa_buffer[256];
-
-	addr pagestart = page0;
-	addr chunkstart = 0;
-	unsigned long pagelen = 4096;
-	unsigned int i = 0;
-       	addr s = 0;
-	for (i = 0; i < pagelen / 4; i++)
+	/* Find the smallest hole that will fit */
+	unsigned int iterator = 0;
+	while (iterator < heap->index.size)
 	{
-		if (page0alloc[i] == 0 && s == 0)
+		struct vmem_header* header = (struct vmem_header*)lookup_ordered_array(iterator, &heap->index);
+		/* If the user has request the memory be page-aligned */
+		if (page_align > 0)
 		{
-			chunkstart = pagestart + i * 4;
-			s++;
+			/* Page-align the starting point of this header */
+			addr location = (addr)header;
+			signed int offset = 0;
+			if ((location+sizeof(struct vmem_header)) & 0xFFFFF000 != 0)
+				offset = 0x1000 /* page size */ - (location+sizeof(struct vmem_header)) % 0x1000;
+			signed int hole_size = (signed int)header->size - offset;
+			/* Can we fit now? */
+			if (hole_size >= (signed int)size)
+				break;
 		}
-		else if (page0alloc[i] == 0 && s < size / 4)
-			s++;
-		else if (page0alloc[i] == 0 && s == size / 4)
-		{
-			/* Found a chunk of appropriate size, so we
-			 * mark all of the appropriate indicies in
-			 * page0alloc as 1 */
-			for (i = 0; i < size / 4; i++)
-				page0alloc[(chunkstart - pagestart) / 4 + i] = 1;
-			page0usage += size;
-			return (void*)chunkstart;
-		}
-		else if (page0alloc[i] == 1)
-			s = 0;
-		else
-			mem_fail_msg("Page 0 allocation array is corrupt");
-	}
-
-	/* We were unable to allocate any more memory
-	 * into page 0 */
-	mem_fail_msg("No more space in page 0");
-	return 0;
-}
-
-/* Frees raw memory within the 0th page */
-void rfree(void* pos, addr size)
-{
-	addr pagestart = page0;
-	addr chunkstart = (addr)pos;
-	unsigned int i = 0;
-	for (i = 0; i < size / 4; i++)
-		page0alloc[(chunkstart - pagestart) / 4 + i] = 1;
-	page0usage -= size;
-}
-
-/* Returns how much of the page 0 memory is in use */
-addr mem_getpage0usage()
-{
-	return page0usage * 4;
-}
-
-/* Returns how much of the other page memory is in use */
-addr mem_getpageusage()
-{
-	return pageusage;
-}
-
-/* Returns how much memory is available in the paging system */
-addr mem_getpageavail()
-{
-	/* TODO: This should actually calculate the amount
-	 * of RAM available instead of total - usage to
-	 * ensure that the figure is absolutely correct */
-	return pagetotal - pageusage;
-}
-
-/* Returns how much RAM is installed in the system */
-addr mem_gettotal()
-{
-	return memtotal;
-}
-
-/* Allocates a section of memory */
-void* palloc(addr size)
-{
-	struct mem_llist* p = pages;
-	addr s = 0;
-	while (p != 0)
-	{
-		if (p->length >= size)
-		{
-			s = p->start;
-			p->start += size;
-			pageusage += size;
-			return (void*)s;
-		}
-		p = p->next;
-	}
-	
-	/* Fail if we can't allocate this memory */
-	mem_fail();
-	return 0;
-}
-
-/* Allocates a section of memory, ensuring that it is
- * page aligned */
-void* palloc_aligned(addr size)
-{
-	struct mem_llist* p = 0;
-	struct mem_llist* t = 0;
-	addr s = 0;
-	unsigned char itoa_buffer[256];
-
-	/* Before we do anything else, we need to allocate
-	 * a new list element for later on (if we were to
-	 * allocate it later, then it would mess up the state
-	 * of the aligned allocation) */
-	t = palloc(sizeof(struct mem_llist));
-	memset((void*)t, 0, sizeof(struct mem_llist));
-	t->prev = 0;
-	t->next = 0;
-	t->start = 0;
-	t->length = 0;
-
-	/* Set p now */
-	p = pages;
-
-	while (p != 0)
-	{
-		s = (p->start & 0xFFFFF000) + 0x1000;
-		if (s == p->start)
-		{
-			/* We already have an aligned space */
-			p->start += size;
-			pageusage += size;
-			pfree(t, sizeof(struct mem_llist));
-			return (void*)s;
-		}
-		else if ((addr)(p->length) >= (addr)(size + 4096))
-			       			/* ensure this section
-						 * has enough space for
-						 * any alignment that
-						 * takes place */
-		{
-			/* This happen a bit differently to normal
-			 * allocation; rather than simply moving
-			 * the start position, we use the new list
-			 * element we created since this new allocation
-			 * will be in the middle of an existing
-			 * free space section */
-			t->prev = p->prev;
-			t->next = p;
-			t->start = p->start;
-			t->length = s - p->start;
-
-			p->start += t->length + size;
-			p->length -= t->length + size;
-			if (pages == p)
-				pages = t;
-			else
-				p->prev->next = t;
-			p->prev = t;
-			pageusage += size;
-
-			return (void*)s;
-		}
-		p = p->next;
-	}
-
-	/* Fail if we can't allocate this memory */
-	mem_fail();
-	return 0;
-}
-
-/* Frees a section of memory */
-void pfree(void* pos, addr size)
-{
-	unsigned char itoa_buffer[256];
-	struct mem_llist* p = pages;
-	struct mem_llist* t = 0;
-	pageusage -= size;
-	while (p != 0)
-	{
-		if (p->prev == 0 && (addr)pos + size <= p->start)
-		{
-			/* This memory is before the start of
-			 * the first available memory (i.e. it
-			 * was allocated from the first block) */
-			if ((addr)pos + size == p->start)
-			{
-				/* The position + size of this free chunk
-				 * is directly before the first start
-				 * position of available memory, so
-				 * simply move the start position back */
-				p->start -= size;
-				return;
-			}
-			else if (p == pages)
-			{
-				/* This memory is before the first available
-				 * memory and doesn't line up with the
-				 * start, so we have to allocate a new
-				 * linked list element */
-				t = palloc(sizeof(struct mem_llist));
-				memset((void*)t, 0, sizeof(struct mem_llist));
-				t->prev = 0;
-				t->next = pages;
-				t->start = (addr)pos;
-				t->length = size;
-
-				/* Now set the global pages to t */
-				pages = t;
-				return;
-			}
-		}
-		else if (p->start + p->length <= (addr)pos && (p->next == 0 || p->next->start >= (addr)pos + size))
-		{
-			/* Does this block of memory fit on the end or
-			 * start of p? */
-			if (p->start + p->length == (addr)pos)
-			{
-				/* The position of this free chunk is
-				 * on the end of the current page, so
-				 * we simply increase the length of p */
-				p->length += size;
-				return;
-			}
-			else if (p->next != 0 && (addr)pos + size == p->next->start)
-			{
-				/* The position + length of this chunk
-				 * is at the start of the next page, so
-				 * we simply move the start position of
-				 * the next page */
-				p->next->start -= size;
-				return;
-			}
-			else if (p->next != 0) /* If we allowed the execution of this
-		       				* code under that situation, then it
-						* would be possible to free memory
-						* beyond the last free page (essentially
-						* adding a new element to the end of
-						* the page allocation list) which would
-						* not be good at all, since then we'd
-						* think we have more memory than we
-						* really do. */
-			{
-				/* This memory is inbetween the current
-				 * page's end and the next page's start
-				 * so we need to insert a new linked list
-				 * element */
-				t = palloc(sizeof(struct mem_llist));
-				memset((void*)t, 0, sizeof(struct mem_llist));
-				t->prev = p;
-				t->next = p->next;
-				t->start = (addr)pos;
-				t->length = size;
-
-				/* Adjust the surrounding elements so they
-				 * point to the next element in the list */
-				p->next = t;
-				t->next->prev = t;
-				return;
-			}
-		}
-
-		p = p->next;
-	}
-
-	/* If we got to here, then we're trying to free
-	 * memory that doesn't exist, or is otherwise
-	 * invalid */
-	mem_fail_msg("Attempt to free non-existant memory");
-}
-
-/* External definitions for the end linker symbol */
-extern addr end;
-
-/* Registers the memory management system */
-void mem_install(struct multiboot_info* mbt, unsigned int magic)
-{
-	struct multiboot_memory_map* mmap = (struct multiboot_memory_map*)mbt->mmap_addr;
-	addr pagel = 0;
-	struct mem_llist* t = 0;
-	struct mem_llist* p = 0;
-	unsigned char itoa_buffer[256];
-
-	/* Find the memory area that contains the end of the kernel
-	 * inside it */
-	puts("Searching memory map to find area with kernel end in it... ");
-	while ((addr)mmap < mbt->mmap_addr + mbt->mmap_length && page0 == 0)
-	{
-		if (mmap->base_addr <= (addr)(&end) && mmap->base_addr + mmap->length > (addr)(&end) && mmap->type == 1 /* is it usable memory? */)
-		{
-			/* Set page 0 to this address and then
-			 * exit the initial loop */
-			puts("found at 0x");
-			puts(itoa((addr)&end, itoa_buffer, 16));
-		       	puts(".\n");
-			page0 = (addr)&end;
-			pagel = mmap->length - ((addr)&end - mmap->base_addr);
-			pagetotal += pagel - 4096;
+		else if (header->size >= size)
 			break;
-		}
-
-		mmap = (struct multiboot_memory_map*)((unsigned int)mmap + mmap->size + sizeof(unsigned int));
+		iterator++;
 	}
 
-	/* Check to see whether page0 is 0 (unset); if it is, we fail
-	 * because we don't have enough memory to store our page allocation
-	 * system */
-	if (page0 == 0)
-		mem_fail_msg("No space for page 0");
+	/* Why did the loop exit? */
+	if (iterator == heap->index.size)
+		return -1; /* We got to the end and didn't find anything */
 	else
-		memset(page0alloc, 0, 1024);
+		return iterator;
+}
 
-	/* Alright, so now we create the list by allocating the first element */
-	puts("Creating raw page allocation list... ");
-	pages = (struct mem_llist*)ralloc(sizeof(struct mem_llist));
-	memset((void*)pages, 0, sizeof(struct mem_llist));
-	pages->prev = 0;
-	pages->start = page0 + 4096;
-	pages->length = page0 + pagel;
-	pages->next = 0;
-	puts("done.\n");
+static signed char vmem_header_less_than(void* a, void* b)
+{
+	return (((struct vmem_header*)a)->size < ((struct vmem_header*)b)->size)?1:0;
+}
 
-	/* Now we mark the rest of our usable memory */
-	puts("Marking the rest of usable memory in raw page allocation list... ");
-	p = pages;
-	mmap = (struct multiboot_memory_map*)mbt->mmap_addr;
-	while ((addr)mmap < mbt->mmap_addr + mbt->mmap_length)
+vmem_heap_t* create_heap(addr start, addr end_addr, addr max, unsigned char supervisor, unsigned char readonly)
+{
+	struct vmem_heap* heap = (struct vmem_heap*)kmalloc(sizeof(struct vmem_heap));
+
+	/* All of our assumptions are made on start and end being page-aligned */
+	ASSERT(start % 0x1000 == 0);
+	ASSERT(end_addr % 0x1000 == 0);
+
+	/* Initalize the index */
+	heap->index = place_ordered_array((void*)start, VMEM_INDEX_SIZE, &vmem_header_less_than);
+
+	/* Shift the start address forward to resemble where we can start putting data */
+	start += sizeof(type_t) * VMEM_INDEX_SIZE;
+
+	/* Make sure the start address is page aligned */
+	if (start & 0xFFFFF000 != 0)
 	{
-		if ((addr)mmap->base_addr + (addr)mmap->length > memtotal)
-			memtotal = (addr)mmap->base_addr + (addr)mmap->length;
-
-		if (mmap->base_addr <= (addr)(&end) && mmap->base_addr + mmap->length > (addr)(&end) && mmap->type == 1)
-		{
-			/* This memory has already been placed as the first valid area */
-		}
-		else if (mmap->base_addr == 0)
-		{
-			/* This memory should not be touched, regardless of whether it
-			 * is valid memory. */
-		}
-		else if (mmap->type == 1)
-		{
-			/* This is a usable section of memory that was not
-			 * used as page0 */
-			t = (struct mem_llist*)ralloc(sizeof(struct mem_llist));
-			memset((void*)t, 0, sizeof(struct mem_llist));
-			p->next = t;
-			t->prev = p;
-			t->start = mmap->base_addr;
-			t->length = mmap->length;
-			t->next = 0;
-			pagetotal += mmap->length;
-			p = t;
-		}
-
-		mmap = (struct multiboot_memory_map*)((unsigned int)mmap + mmap->size + sizeof(unsigned int));
+		start &= 0xFFFFF000;
+		start += 0x1000;
 	}
-	puts("\n");
 
-	puts("Total installed RAM has been detected as: ");
-	puts(itoa(memtotal, itoa_buffer, 10));
-	puts(".\n");
+	/* Write the start, end and max addresses into the heap structure */
+	heap->start_address = start;
+	heap->end_address = end_addr;
+	heap->max_address = max;
+	heap->supervisor = supervisor;
+	heap->readonly = readonly;
+
+	/* We start off with one large hole in the index */
+	struct vmem_header* hole = (struct vmem_header*)start;
+	hole->size = end_addr - start;
+	hole->magic = VMEM_MAGIC;
+	hole->is_hole = 1;
+	insert_ordered_array((void*)hole, &heap->index);
+
+	return heap;
+}
+
+static void expand(addr new_size, struct vmem_heap* heap)
+{
+	/* Sanity check */
+	ASSERT(new_size > heap->end_address - heap->start_address);
+
+	/* Get the nearest following page boundary */
+	if (new_size & 0xFFFFF000 != 0)
+	{
+		new_size &= 0xFFFFF000;
+		new_size += 0x1000;
+	}
+
+	/* Make sure we are not overreaching ourselves */
+	ASSERT(heap->start_address + new_size <= heap->max_address);
+
+	/* This should always be on a page boundary */
+	addr old_size = heap->end_address - heap->start_address;
+	addr i = old_size;
+
+	while (i < new_size)
+	{
+		frame_alloc( get_page(heap->start_address+i, 1, kernel_directory),
+				(heap->supervisor)?1:0, (heap->readonly)?0:1);
+		i += 0x1000; /* page size */
+	}
+
+	heap->end_address = heap->start_address+new_size;
+}
+
+static addr contract(addr new_size, struct vmem_heap* heap)
+{
+	/* Sanity check */
+	ASSERT(new_size < heap->end_address - heap->start_address);
+
+	/* Get the nearest following page boundary */
+	if (new_size & 0x1000)
+	{
+		new_size &= 0x1000;
+		new_size += 0x1000;
+	}
+
+	/* Don't contract too far */
+	if (new_size < VMEM_MIN_SIZE)
+		new_size = VMEM_MIN_SIZE;
+	addr old_size = heap->end_address - heap->start_address;
+	addr i = old_size;
+	while (new_size < i)
+	{
+		frame_free(get_page(heap->start_address + i, 0, kernel_directory));
+		i -= 0x1000;
+	}
+	heap->end_address = heap->start_address + new_size;
+	return new_size;
+}
+
+void* vmalloc(addr size, unsigned char page_align, struct vmem_heap* heap)
+{
+	/* Make sure we take the size of the header / footer into account */
+	addr new_size = size + sizeof(struct vmem_header) + sizeof(struct vmem_footer);
+
+	/* Find the smallest hole that will fit */
+	signed int iterator = find_smallest_hole(new_size, page_align, heap);
+
+	if (iterator == -1) /* If we didn't find a suitable hole */
+	{
+		/* Save some previous data */
+		addr old_length = heap->end_address - heap->start_address;
+		addr old_end_address = heap->end_address;
+
+		/* We need to allocate some more space */
+		expand(old_length + new_size, heap);
+		addr new_length = heap->end_address - heap->start_address;
+
+		/* Find the endmost header (not endmost in size, but in location) */
+		iterator = 0;
+		/* Vars to hold the index of, and value of, the endmost header found so far */
+		addr idx = -1; addr value = 0x0;
+		while (iterator < heap->index.size)
+		{
+			addr tmp = (addr)lookup_ordered_array(iterator, &heap->index);
+			if (tmp > value)
+			{
+				value = tmp;
+				idx = iterator;
+			}
+			iterator++;
+		}
+
+		/* If we didn't find any headers, we need to add one */
+		if (idx == -1)
+		{
+			struct vmem_header* header	= (struct vmem_header*)old_end_address;
+			header->magic			= VMEM_MAGIC;
+			header->size			= new_length - old_length;
+			header->is_hole			= 1;
+			struct vmem_footer* footer	= (struct vmem_footer*)(old_end_address + header->size
+							  - sizeof(struct vmem_footer));
+			footer->magic			= VMEM_MAGIC;
+			footer->header			= header;
+			insert_ordered_array((void*)header, &heap->index);
+		}
+		else
+		{
+			/* The last header needs adjusting */
+			struct vmem_header* header = lookup_ordered_array(idx, &heap->index);
+			header->size += new_length - old_length;
+			
+			/* Rewrite the footer */
+			struct vmem_footer* footer = (struct vmem_footer*)((addr)header + header->size - 
+						     sizeof(struct vmem_footer));
+			footer->header = header;
+			footer->magic = VMEM_MAGIC;
+		}
+	}
+
+	struct vmem_header* orig_hole_header = (struct vmem_header*)lookup_ordered_array(iterator, &heap->index);
+	addr orig_hole_pos = (addr)orig_hole_header;
+	addr orig_hole_size = orig_hole_header->size;
+
+	/* Here we work out if we should split the hole we found into two parts.
+	 * Is the original hole size - requested hole size less than the overhead for adding a new hole? */
+	if (orig_hole_size - new_size < sizeof(struct vmem_header) + sizeof(struct vmem_footer))
+	{
+		/* Then just increase the requested size to the size of the hole we found */
+		size += orig_hole_size - new_size;
+		new_size = orig_hole_size;
+	}
+
+	/* If we need to page-align the data, do it now and make a new hole in front of our block */
+	if (page_align && (orig_hole_pos & 0xFFFFF000))
+	{
+		addr new_location		= orig_hole_pos + 0x1000 /* page size */ - (orig_hole_pos & 0xFFF) - 
+					  	  sizeof(struct vmem_header);
+		struct vmem_header* hole_header = (struct vmem_header*)orig_hole_pos;
+		hole_header->size		= 0x1000 /* page size */ - (orig_hole_pos & 0xFFF) -
+						  sizeof(struct vmem_header);
+		hole_header->magic		= VMEM_MAGIC;
+		hole_header->is_hole		= 1;
+		struct vmem_footer* hole_footer	= (struct vmem_footer*)((addr)new_location - sizeof(struct vmem_footer));
+		hole_footer->magic		= VMEM_MAGIC;
+		hole_footer->header		= hole_header;
+		orig_hole_pos			= new_location;
+		orig_hole_size			= orig_hole_size - hole_header->size;
+	}
+	else
+	{
+		/* Else we don't need this hole any more, delete it from the index */
+		remove_ordered_array(iterator, &heap->index);
+	}
+
+	/* Overwrite the original header... */
+	struct vmem_header* block_header	= (struct vmem_header*)orig_hole_pos;
+	block_header->magic			= VMEM_MAGIC;
+	block_header->is_hole			= 0;
+	block_header->size			= new_size;
+	/* ... and the footer */
+	struct vmem_footer* block_footer	= (struct vmem_footer*)(orig_hole_pos + sizeof(struct vmem_header) + size);
+	block_footer->magic			= VMEM_MAGIC;
+	block_footer->header			= block_header;
+
+	/* We may need to write a new hole after the allocated block.
+	 * We do this only if the new hole would have positive size */
+	if (orig_hole_size - new_size > 0)
+	{
+		struct vmem_header* hole_header	= (struct vmem_header*)(orig_hole_pos + sizeof(struct vmem_header) + size +
+						  sizeof(struct vmem_footer));
+		hole_header->magic		= VMEM_MAGIC;
+		hole_header->is_hole		= 1;
+		hole_header->size		= orig_hole_size - new_size;
+		struct vmem_footer* hole_footer	= (struct vmem_footer*)((addr)hole_header + orig_hole_size - new_size -
+						  sizeof(struct vmem_footer));
+		if ((addr)hole_footer < heap->end_address)
+		{
+			hole_footer->magic	= VMEM_MAGIC;
+			hole_footer->header	= hole_header;
+		}
+		
+		/* Put the new hole in the array */
+		insert_ordered_array((void*)hole_header, &heap->index);
+	}
+
+	/* ... and we're done! */
+	return (void*)((addr)block_header + sizeof(struct vmem_header));
+}
+
+void vfree(void *p, struct vmem_heap* heap)
+{
+	/* Exit gracefully for null pointers */
+	if (p == 0)
+		return;
+
+	/* Get the header and footer associated with this pointer */
+	struct vmem_header* header = (struct vmem_header*)((addr)p - sizeof(struct vmem_header));
+	struct vmem_footer* footer = (struct vmem_footer*)((addr)header + header->size - sizeof(struct vmem_footer));
+
+	/* Sanity checks */
+	ASSERT(header->magic == VMEM_MAGIC);
+	ASSERT(footer->magic == VMEM_MAGIC);
+
+	/* Make us a hole */
+	header->is_hole = 0;
+
+	/* Do we want to add this header to the free holes index */
+	char do_add = 1;
+
+	/* Unify left */
+	struct vmem_footer* test_footer = (struct vmem_footer*)((addr)header - sizeof(struct vmem_footer));
+	if (test_footer->magic == VMEM_MAGIC && test_footer->header->is_hole == 1)
+	{
+		addr cache_size = header->size;	/* Cache our current size */
+		header = test_footer->header;	/* Rewrite our header with the new one */
+		footer->header = header;	/* Rewrite our footer to point to the new header */
+		header->size += cache_size;	/* Change the size */
+		do_add = 0;			/* Since this header is already in the index, we don't want to add it */
+	}
+
+	/* Unify right */
+	struct vmem_header* test_header = (struct vmem_header*)((addr)footer + sizeof(struct vmem_footer));
+	if (test_header->magic == VMEM_MAGIC && test_header->is_hole)
+	{
+		header->size += test_header->size;	/* Increase our size */
+		test_footer = (struct vmem_footer*)((addr)test_header + test_header->size - sizeof(struct vmem_footer));
+		footer = test_footer;
+
+		/* Find and remove this kernel from the index */
+		unsigned int iterator = 0;
+		while ((iterator < heap->index.size) &&
+			(lookup_ordered_array(iterator, &heap->index) != (void*)test_header))
+			iterator++;
+
+		/* Make sure we actually found the item */
+		ASSERT(iterator < heap->index.size);
+
+		/* Remove it */
+		remove_ordered_array(iterator, &heap->index);
+	}
+
+	/* If the footer location is the end address, we can contract */
+	if ((addr)footer + sizeof(struct vmem_footer) == heap->end_address)
+	{
+		addr old_length = heap->end_address - heap->start_address;
+		addr new_length = contract((addr)header - heap->start_address, heap);
+
+		/* Check how big we will be after resizing */
+		if (header->size - (old_length - new_length) > 0)
+		{
+			/* We will still exist, so resize us */
+			header->size -= old_length - new_length;
+			footer = (struct vmem_footer*)((addr)header + header->size - sizeof(struct vmem_footer));
+			footer->magic = VMEM_MAGIC;
+			footer->header = header;
+		}
+		else
+		{
+			/* We will no longer exist, remove us from the index */
+			unsigned int iterator = 0;
+			while ((iterator < heap->index.size) &&
+				(lookup_ordered_array(iterator, &heap->index) != (void*)test_header))
+				iterator++;
+
+			/* If we didn't find ourselves, we have nothing to remove */
+			if (iterator < heap->index.size)
+				remove_ordered_array(iterator, &heap->index);
+		}
+	}
+
+	/* Add ourselves if we need to */
+	if (do_add == 1)
+		insert_ordered_array((void*)header, &heap->index);
 }

@@ -1,36 +1,50 @@
 #include <system.h>
+#include <frame.h>
 #include <isrs.h>
 #include <page.h>
+#include <vmem.h>
 
 struct page_directory* current_directory = 0;
 struct page_directory* kernel_directory = 0;
+extern addr kmem_addr;
+extern struct vmem_heap* kmem_heap;
+extern unsigned int* frames;
+extern unsigned int nframes;
+extern unsigned int end;
 
-/* Maps the block address + 4MB into the paging system
- * with the specified flags set.  Returns the address
- * of the new page table which should be added to the
- * page directory */
-addr* page_table_new(addr address, addr flags)
+/* Gets the specified page */
+page_t* get_page(addr address, int make, struct page_directory* dir)
 {
-	addr i = 0;
-	addr* table = (addr*)palloc_aligned(sizeof(addr) * 1024);
-	memset((void*)table, 0, sizeof(addr) * 1024);
-	for (i = 0; i < 1024; i++)
+	/* Turn the address into an index */
+	address /= 0x1000;
+
+	/* Find the page table containing this address */
+	unsigned int table_idx = address / 1024;
+	if (dir->tables[table_idx]) /* If this table is already assigned */
 	{
-		table[i] = address | flags; /* Attributes: supervisor level, read/write, present */
-		address += 4096; /* Advanced the address to the next page boundry */
+		return &dir->tables[table_idx]->pages[address%1024];
 	}
-	return table;
+	else if (make)
+	{
+		unsigned int tmp;
+		dir->tables[table_idx] = (struct page_table*)kmalloc_ap(sizeof(struct page_table), &tmp);
+		memset(dir->tables[table_idx], 0, 0x1000);
+		dir->tables_phys[table_idx] = tmp | 0x7;
+		return &dir->tables[table_idx]->pages[address%1024];
+	}
+	else
+		return 0;
 }
 
 /* Handles setting the page directory */
-void page_switch(addr* dir)
+void page_switch(struct page_directory* dir)
 {
 	unsigned int cr0;
-	page_directory = dir;
-	asm volatile("mov %0, %%cr3":: "b"(page_directory));
-	asm volatile("mov %%cr0, %0": "=b"(cr0));
+	current_directory = dir;
+	asm volatile("mov %0, %%cr3":: "r"(&dir->phys_addr));
+	asm volatile("mov %%cr0, %0": "=r"(cr0));
 	cr0 |= 0x80000000;
-	asm volatile("mov %0, %%cr0":: "b"(cr0));
+	asm volatile("mov %0, %%cr0":: "r"(cr0));
 }
 
 /* Handles a page fault */
@@ -76,6 +90,11 @@ void page_install(addr upper)
 		return;
 	}
 
+	/* Set the frames and frame count */
+	nframes = end / 0x1000;
+	frames = (unsigned int*)kmalloc(INDEX_FROM_BIT(nframes));
+	memset(frames, 0, INDEX_FROM_BIT(nframes));
+
 	/* Initalize the page directory area */
 	puts("Initializing memory for page directory... ");
 	kernel_directory = (struct page_directory*)kmalloc_a(sizeof(struct page_directory));
@@ -85,30 +104,29 @@ void page_install(addr upper)
 	puts(itoa((addr)kernel_directory, itoa_buffer, 16));
 	puts(".\n");
 
+	/* Map some pages in the kernel heap area */
+	for (i = VMEM_START; i < VMEM_START + VMEM_INITIAL_SIZE; i += 0x1000)
+		get_page(i, 1, kernel_directory);
+
 	/* Set the initial state of the page directory */
 	puts("Initializing contents of page directory... ");
-	for (i = 0; i < 1024; i++)
+	while (i < kmem_addr + 0x1000)
 	{
-		/* Attributes: supervisor level, read/write, not present */
-		kernel_directory[i] = 0 | 2;
+		/* Kernel code is readable but not writable from userspace */
+		frame_alloc(get_page(i, 1, kernel_directory), 0, 0);
+		i += 0x1000;	
 	}
 	puts("done.\n");
 
-	/* Create the page tables */
-	for (i = 0; i < upper / (4 * 1024 * 1024); i += 1)
-	{
-		puts("Initializing page table for ");
-		puts(itoa(i * 4, itoa_buffer, 10));
-		puts("MB - ");
-		puts(itoa((i + 1) * 4, itoa_buffer, 10));
-		puts("MB... ");
-		kernel_directory[i]  = (addr)page_table_new(i * 4 * 1024 * 1024, 3);
-		kernel_directory[i] |= 3;
-		puts("done.\n");
-	}
+	/* Now allocate those pages we mapped earlier */
+	for (i = VMEM_START; i < VMEM_START + VMEM_INITIAL_SIZE; i += 0x1000)
+		frame_alloc(get_page(i, 1, kernel_directory), 0, 0);
 
 	/* Now enable paging */
 	puts("Enabling paging... ");
 	page_switch(kernel_directory);
 	puts("done.\n");
+
+	/* Initalize the kernel's virtual memory */
+	kmem_heap = create_heap(VMEM_START, VMEM_START + VMEM_INITIAL_SIZE, 0xCFFFF000, 0, 0);
 }

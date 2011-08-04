@@ -1,7 +1,7 @@
 #include <system.h>
 #include <task.h>
 #include <tss.h>
-#include <mem.h>
+#include <kmem.h>
 
 /* Clones a page directory */
 addr* clone_directory
@@ -13,11 +13,11 @@ process_t* process_new()
 	int i = 0;
 
 	/* Allocate memory for the process structure */
-	struct process* result = (struct process*)palloc(sizeof(struct process));
+	struct process* result = (struct process*)kalloc(sizeof(struct process));
 	memset((void*)result, 0, sizeof(struct process));
 
 	/* Create a page directory for new process */
-	result->page_directory = (addr*)palloc_aligned(sizeof(addr) * 1024);
+	result->page_directory = (addr*)kalloc_a(sizeof(addr) * 1024);
 	memset((void*)result->page_directory, 0, sizeof(addr) * 1024);
 	
 	/* Set the initial state of the page directory */

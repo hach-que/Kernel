@@ -6,11 +6,9 @@
 #include <idt.h>
 #include <isrs.h>
 #include <tss.h>
-#include <process.h>
 
 #include <timer.h>
 #include <scrn.h>
-#include <mem.h>
 #include <page.h>
 
 /* You will need to code these up yourself! */
@@ -70,14 +68,14 @@ void outportb(unsigned short _port, unsigned char _data)
 
 void printmem()
 {
-	unsigned char itoa_buffer[256];
+	/*unsigned char itoa_buffer[256];
 	puts(" [pzero: ");
 	puts(itoa(mem_getpage0usage(), itoa_buffer, 10));
 	puts("] [usage: ");
 	puts(itoa(mem_getpageusage(), itoa_buffer, 10));
 	puts("] [avail: ");
 	puts(itoa(mem_getpageavail(), itoa_buffer, 10));
-	puts("]\n");
+	puts("]\n");*/
 }
 
 /* The definition for the entry point of the built-in userland
@@ -97,6 +95,7 @@ void _main(struct multiboot_info* mbt, unsigned int magic)
 	idt_install();
 	isrs_install();
 	irq_install();
+	kmem_install(mbt);
 	
 	/* Enable IRQs */
 	__asm__ __volatile__ ("sti");
@@ -105,14 +104,37 @@ void _main(struct multiboot_info* mbt, unsigned int magic)
 	timer_install();
 	kb_install();
 	init_video();
-	mem_install(mbt, magic);
-	page_install(mem_gettotal());
+
+	puts("total: 0x");
+	puts(itoa(kmem_total(), itoa_buffer, 16));
+	puts("\n");
+
+	addr a = kmalloc(8);
+	puts("a: 0x");
+	puts(itoa(a, itoa_buffer, 16));
+	puts("\n");
+
+	page_install(kmem_total());
+	addr b = kmalloc(8);
+	addr c = kmalloc(8);
+	puts("a: 0x");
+	puts(itoa(a, itoa_buffer, 16));
+	puts(", b: 0x");
+	puts(itoa(b, itoa_buffer, 16));
+	puts("\nc: 0x");
+	puts(itoa(c, itoa_buffer, 16));
+	kfree(c);
+	kfree(b);
+	addr d = kmalloc(12);
+	puts(", d: 0x");
+	puts(itoa(d, itoa_buffer, 16));
+
 
 	/* "Start" a new process */
 	//struct process* proc = process_new();
 	//process_enter(proc);
-	tss_to_user();
-	entry();
+	//tss_to_user();
+	//entry();
 
 	for (;;);
 

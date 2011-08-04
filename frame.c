@@ -6,10 +6,6 @@
 unsigned int* frames;
 unsigned int nframes;
 
-/* Macros used in the bitset algorithms */
-#define INDEX_FROM_BIT(a) (a/(8*4))
-#define OFFSET_FROM_BIT(a) (a%(8*4))
-
 /* Static function to set a bit in the frames bitset */
 static void set_frame(addr frame_addr)
 {
@@ -69,10 +65,7 @@ void frame_alloc(struct page* p, int is_kernel, int is_writable)
 	{
 		addr idx = first_frame(); /* The first free frame */
 		if (idx == (addr) - 1)
-		{
-			puts("No free frames!\n");
-			for(;;);
-		}
+			PANIC("No free frames!");
 		set_frame(idx*0x1000);		/* This frame is now ours */
 		p->present = 1;			/* Mark it as present */
 		p->rw = (is_writable)?1:0;	/* Should the page be writable? */
@@ -85,13 +78,13 @@ void frame_alloc(struct page* p, int is_kernel, int is_writable)
 void frame_free(struct page* p)
 {
 	addr frame;
-	if (!(frame=page->frame))
+	if (!(frame = p->frame))
 	{
 		/* The given page didn't actually have an allocate frame */
 	}
 	else
 	{
 		clear_frame(frame);		/* Frame is now free again */
-		page->frame =0x0;		/* Page now doesn't have a frame */
+		p->frame = 0x0;			/* Page now doesn't have a frame */
 	}
 }
