@@ -1,5 +1,6 @@
 #include <system.h>
 #include <timer.h>
+#include <task.h>
 #include <irq.h>
 
 /* This will keep track of how many ticks that the system
@@ -14,6 +15,10 @@ void timer_handler(struct regs* r)
 {
 	/* Increment our 'tick count' */
 	timer_ticks++;
+
+	/* Instruct the task management system to
+	 * potentially switch tasks */
+	switch_task();
 }
 
 /* Sets the phase of the hardware timer */

@@ -5,7 +5,6 @@
 [BITS 32]
 global start
 start:
-	mov esp, _sys_stack	; This points the stack to our new stack area
 	jmp stublet
 
 ; This part MUST be 4 byte aligned, so we solve that issue using 'ALIGN 4'
@@ -37,7 +36,7 @@ mboot:
 ; will insert an 'extern _main', followed by a 'call _main', right
 ; before the 'jmp $'.
 stublet:
-	push eax		; Pushs the magic number onto the stack
+	push esp		; Pushs the stack address
 	push ebx		; Pushs the 32-bit address of the multiboot info structure to the stack
 	extern _main
 	call _main
@@ -93,5 +92,4 @@ _idt_load:
 ; the identifier '_sys_stack'
 SECTION .bss
 	resb 8192	; This reserves 8 kilobytes of memory here
-_sys_stack:
 

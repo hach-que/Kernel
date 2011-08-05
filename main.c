@@ -6,6 +6,7 @@
 #include <idt.h>
 #include <isrs.h>
 #include <tss.h>
+#include <task.h>
 
 #include <timer.h>
 #include <scrn.h>
@@ -14,7 +15,6 @@
 #include <vfs.h>
 #include <initrd.h>
 
-/* You will need to code these up yourself! */
 void* memcpy(void* dest, const void* src, int count)
 {
 	/* Add code here to copy 'count' bytes of data from 'src' to
@@ -69,49 +69,64 @@ void outportb(unsigned short _port, unsigned char _data)
 	__asm__ __volatile__ ("outb %1, %0" : : "dN" (_port), "a" (_data));
 }
 
-void printmem()
-{
-	/*unsigned char itoa_buffer[256];
-	puts(" [pzero: ");
-	puts(itoa(mem_getpage0usage(), itoa_buffer, 10));
-	puts("] [usage: ");
-	puts(itoa(mem_getpageusage(), itoa_buffer, 10));
-	puts("] [avail: ");
-	puts(itoa(mem_getpageavail(), itoa_buffer, 10));
-	puts("]\n");*/
-}
-
 /* The definition for the entry point of the built-in userland
  * application */
 extern void entry();
 
+/* A global variable for storing the stack position */
+addr initial_esp;
+
 /* This is a very simple main() function.  All it does is sit in an
  * infinite loop.  This will be like our 'idle' loop */
-void _main(struct multiboot_info* mbt, unsigned int magic)
+void _main(struct multiboot_info* mbt, addr stack)
 {
-	unsigned char itoa_buffer[256];
-	void* test1 = 0;
-	void* test2 = 0;
+	/* Store the stack position in a global variable */
+	initial_esp = stack;
 
 	/* Setup the very core components of the kernel / CPU operation */
+	unsigned char itoa_buffer[256];
 	gdt_install();
 	idt_install();
 	isrs_install();
 	irq_install();
-	kmem_install(mbt);
-	
-	/* Enable IRQs */
-	__asm__ __volatile__ ("sti");
-
-	/* Install and handle various devices in the system */
-	timer_install();
-	kb_install();
 	init_video();
 
-	/* Install the initrd filesystem so we can use it */
+	/* Enable IRQs */
+	asm volatile("sti");
+
+	/* Install the initrd filesystem before memory management
+	 * so that it doesn't get overwritten before we read it */
 	ASSERT(mbt->mods_count > 0);
-	fs_root = initrd_install(*((unsigned int*)(mbt->mods_addr)));
-	
+	puts("Initializing initrd... ");
+	fs_root = initrd_install(*((addr*)(mbt->mods_addr)));
+	puts("done.\n");
+
+	/* Install memory and task management */
+	kmem_install(mbt);
+	page_install();
+	task_install();
+
+	/* Install and handle various devices in the system */
+	puts("Enabling devices... ");
+	timer_install();
+	kb_install();
+	puts("done.\n");
+
+	/* Test the task management system */
+	puts("Forking kernel...\n");
+	int ret = fork();
+	puts("fork() returned ");
+	puts(itoa(ret, itoa_buffer, 10));
+	puts(", and getpid() returned ");
+	puts(itoa(getpid(), itoa_buffer, 10));
+	puts("\n==========================================\n");
+
+	/* The next section of code is not re-entrant (because the initrd
+	 * VFS uses global variables which will be shared between both
+	 * processes), so make sure we aren't interrupted during listing
+	 * the contents of /. */
+	asm volatile("cli");
+
 	/* List the contents of the initrd */
 	int i = 0;
 	struct dirent* node = 0;
@@ -135,6 +150,13 @@ void _main(struct multiboot_info* mbt, unsigned int magic)
 		}
 		i++;
 	}
+	puts("\n");
+
+	/* Re-enable interrupts */
+	asm volatile("sti");
+
+	ret = fork();
+	puts("This message SHOULD BE REPEATED 4 TIMES!\n");
 	
 	/* ...and leave this loop in.  There is an endless loop in
 	 * 'start.asm' also, if you accidently delete this next line */

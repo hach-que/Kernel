@@ -66,6 +66,7 @@ _isr5:
 	jmp isr_common_stub
 _isr6:
 	cli
+	xchg bx, bx
 	push byte 0
 	push byte 6
 	jmp isr_common_stub

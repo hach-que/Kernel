@@ -103,7 +103,7 @@ void _irq_handler(struct regs r)
 	/* Find out if we have a custom handler to run
 	 * for this IRQ, and then finally, run it */
 	handler = irq_routines[r.int_no - 32];
-	if (handler)
+	if (handler && r.int_no - 32 != 0)
 		handler(&r);
 
 	/* If the IDT entry that was invoked was greater
@@ -115,4 +115,12 @@ void _irq_handler(struct regs r)
 	/* In either case, we need to send an EOI to the
 	 * master interrupt controller too */
 	outportb(0x20, 0x20);
+
+	/* In the event of a timer interrupt, we might be
+	 * task switching, so we can only perform the task
+	 * switch AFTER we have sent the EOI to the
+	 * interrupt controller, hence we called the handler
+	 * for a timer interrupt here instead */
+	if (handler && r.int_no - 32 == 0)
+		handler(&r);
 }

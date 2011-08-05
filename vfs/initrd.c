@@ -91,6 +91,7 @@ struct fs_node* initrd_install(unsigned int location)
 	initrd_dev->impl = 0;
 
 	/* Start adding files in the ramdisk */
+	ASSERT(initrd_header->nfiles < 64);
 	root_nodes = (struct fs_node*)kmalloc(sizeof(struct fs_node) * initrd_header->nfiles);
 	nroot_nodes = initrd_header->nfiles;
 
@@ -104,7 +105,7 @@ struct fs_node* initrd_install(unsigned int location)
 		file_headers[i].offset += location;
 
 		/* Create a new file inode */
-		strcpy(root_nodes[i].name, &file_headers[i].name, strlen(&file_headers[i].name));
+		strcpy(root_nodes[i].name, (const unsigned char*)&file_headers[i].name, strlen((const unsigned char*)&file_headers[i].name));
 		root_nodes[i].mask = root_nodes[i].uid = root_nodes[i].gid = 0;
 		root_nodes[i].length = file_headers[i].length;
 		root_nodes[i].inode = i;

@@ -14,7 +14,7 @@ struct initrd_header
 
 int main(char argc, char** argv)
 {
-	int nheaders = (argc-1)/2;
+	unsigned int nheaders = (argc-1)/2;
 	struct initrd_header headers[64];
 	printf("size of header; %d\n", sizeof(struct initrd_header));
 	unsigned int off = sizeof(struct initrd_header) * 64 + sizeof(int);
@@ -40,7 +40,7 @@ int main(char argc, char** argv)
 
 	FILE* wstream = fopen("./initrd.img", "w");
 	unsigned char* data = (unsigned char*)malloc(off);
-	fwrite(&nheaders, sizeof(int), 1, wstream);
+	fwrite(&nheaders, sizeof(unsigned int), 1, wstream);
 	fwrite(headers, sizeof(struct initrd_header), 64, wstream);
 
 	for (i = 0; i < nheaders; i++)

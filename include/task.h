@@ -1,16 +1,25 @@
 #ifndef __PROCESS_H
 #define __PROCESS_H
 
-/* Structure definition of a process */
-typedef struct process
+#include <system.h>
+#include <page.h>
+
+/* Structure for a process */
+struct task
 {
-	/* The page directory for the process */
-	addr* page_directory;
+	int id;					/* Process ID */
+	addr esp, ebp;				/* Stack and base pointers */
+	addr eip;				/* Instruction pointer */
+	struct page_directory* page_directory;	/* Page directory */
+	struct task* next;			/* Next task in a linked list */
+};
 
-} process_t;
+/* TASK.C */
+extern void task_install();
+extern void task_switch();
+extern void move_stack(void* new_stack_start, addr size);
 
-/* PROCESS.C */
-extern process_t* process_new();
-extern void process_enter(struct process* proc);
+extern int fork();
+extern int getpid();
 
 #endif

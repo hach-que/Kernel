@@ -17,7 +17,7 @@ static addr kmalloc_i(addr size, int align, addr* phys)
 		if (phys != 0)
 		{
 			struct page* p = (struct page*)get_page((addr)address, 0, kernel_directory);
-			*phys = p->frame*0x1000 + (addr)address&0xFFF;
+			*phys = p->frame*0x1000 + ((addr)address&0xFFF);
 		}
 		return (addr)address;
 	}
