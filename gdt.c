@@ -79,7 +79,7 @@ void gdt_install()
 	gdt_set_gate(3, 0, 0xFFFFFFFF, 0xFA, 0xCF);
 	gdt_set_gate(4, 0, 0xFFFFFFFF, 0xF2, 0xCF);
 
-	/* Install the TSS and user mode segments into the GDT */
+	/* Install the TSS into the GDT */
 	tss_install(5, 0x10, 0x0);
 
 	/* Flush our the old GDT / TSS and install the new changes! */

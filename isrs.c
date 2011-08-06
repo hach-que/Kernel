@@ -80,7 +80,7 @@ void isrs_install()
 	idt_set_gate(29, (unsigned)_isr29, 0x08, 0x8E);
 	idt_set_gate(30, (unsigned)_isr30, 0x08, 0x8E);
 	idt_set_gate(31, (unsigned)_isr31, 0x08, 0x8E);
-	idt_set_gate(80, (unsigned)_isr80, 0x08, 0x8E);
+	idt_set_gate(0x80, (unsigned)_isr80, 0x08, 0x8E | 0x60);
 }
 
 /* This is a simple string array.  It contains the message that
@@ -139,6 +139,8 @@ void _fault_handler(struct regs r)
 	/* Is this a fault we want to handle? */
 	switch (r.int_no)
 	{
+		case 13:
+			return;
 		case 14:
 			/* Page fault; send to page.c */
 			_page_fault(&r);

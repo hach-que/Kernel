@@ -112,6 +112,17 @@ void _main(struct multiboot_info* mbt, addr stack)
 	kb_install();
 	puts("done.\n");
 
+	/* Test user-mode */
+	puts("Entering user-mode... \n");
+	int a;
+	for (a = 0; a < 16; a += 1)
+		puts("=====");
+	puts("\n");
+	tss_switch();
+	entry();
+
+	for (;;);
+
 	/* Test the task management system */
 	puts("Forking kernel...\n");
 	int ret = fork();

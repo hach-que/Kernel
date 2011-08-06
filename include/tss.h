@@ -61,7 +61,7 @@ typedef volatile struct tss
 /* TSS.C */
 extern void tss_set_kernel_stack(unsigned int stack);
 extern void tss_install(signed int num, unsigned short ss0, unsigned short esp0);
-extern void tss_to_user();
+extern void tss_switch();
 
 #endif
 

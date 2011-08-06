@@ -4,6 +4,8 @@
 #include <system.h>
 #include <page.h>
 
+#define KERNEL_STACK_SIZE 2048			/* Use a 2KB stack */
+
 /* Structure for a process */
 struct task
 {
@@ -11,6 +13,7 @@ struct task
 	addr esp, ebp;				/* Stack and base pointers */
 	addr eip;				/* Instruction pointer */
 	struct page_directory* page_directory;	/* Page directory */
+	addr kernel_stack;			/* Kernel stack location */
 	struct task* next;			/* Next task in a linked list */
 };
 

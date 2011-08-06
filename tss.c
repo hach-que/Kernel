@@ -1,7 +1,5 @@
-/* Based off the "Getting to User Mode" tutorial on
- * http://www.germsoft.com/Software/OS/Tut/Html/um.html */
-
 #include <system.h>
+#include <task.h>
 #include <tss.h>
 
 tss_t sys_tss;
@@ -50,9 +48,16 @@ void tss_install(signed int num, unsigned short ss0, unsigned short esp0)
 	sys_tss.ss = sys_tss.ds = sys_tss.es = sys_tss.fs = sys_tss.gs = 0x13;
 }
 
+/* Extern definition to access the current task */
+extern volatile struct task* current_task;
+
 /* Jumps the system to user mode */
-void tss_to_user()
+void tss_switch()
 {
+	// Set up the kernel stack.
+	tss_set_kernel_stack(current_task->kernel_stack + KERNEL_STACK_SIZE);
+
+	// Jump into user mode.
 	asm volatile("\
 cli; \
 mov $0x23, %ax; \
@@ -65,8 +70,11 @@ mov %esp, %eax; \
 pushl $0x23; \
 pushl %eax; \
 pushf; \
-mov $0x200, %eax; \
+\
+pop %eax; \
+or $0x200, %eax; \
 push %eax; \
+\
 pushl $0x1B; \
 push $1f; \
 iret; \

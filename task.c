@@ -2,6 +2,7 @@
 #include <frame.h>
 #include <task.h>
 #include <page.h>
+#include <tss.h>
 
 /* The currently running task */
 volatile struct task* current_task;
@@ -88,6 +89,7 @@ int fork()
 	new_task->esp = new_task->ebp = 0;
 	new_task->eip = 0;
 	new_task->page_directory = directory;
+	new_task->kernel_stack = kmalloc_a(KERNEL_STACK_SIZE);
 	new_task->next = 0;
 
 	/* Add it to the end of the ready queue
@@ -185,6 +187,9 @@ void switch_task()
 	 * page directory */
 	current_directory = current_task->page_directory;
 
+	/* Change the kernel stack over */
+	tss_set_kernel_stack(current_task->kernel_stack + KERNEL_STACK_SIZE);
+
 	/* Here we:
 	 * - Stop interrupts so we don't get interrupted.
 	 * - Temporarily put the new EIP location in ECX.
@@ -229,6 +234,7 @@ void task_install()
 	current_task->eip = 0;
 	current_task->page_directory = current_directory;
 	current_task->next = 0;
+	current_task->kernel_stack = kmalloc_a(KERNEL_STACK_SIZE);
 
 	/* Re-enable interrupts */
 	asm volatile("sti");
